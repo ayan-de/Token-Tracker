@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodexBar</title>
+    <script type="module" src="./main.js"></script>
+  </head>
+
+  <body>
+    <div class="app-container">
+      <!-- Header -->
+      <header>
+        <div class="brand">
+          <h1>CodexBar</h1>
+          <div id="server-status" class="server-badge">
+            <span id="status-dot" class="badge-dot demo"></span>
+            <span id="status-text">Demo Mode</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="refresh-btn" class="btn-icon" title="Refresh Usage">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Content Area -->
+      <div id="main-content">
+        <!-- Loader -->
+        <div id="loader" class="loader-container">
+          <div class="spinner"></div>
+          <p>Syncing AI quotas...</p>
+        </div>
+
+        <!-- Providers List -->
+        <div id="providers-container" style="display: none;">
+          <div class="section-title">
+            <span>Enabled Providers</span>
+          </div>
+          <div id="providers-list" class="providers-list">
+            <!-- Dynamic provider cards injected here -->
+          </div>
+        </div>
+
+        <!-- Cost Card -->
+        <div id="cost-container" style="display: none;">
+          <div class="section-title">
+            <span>Cost & Spend (30d)</span>
+          </div>
+          <div id="cost-card" class="cost-card">
+            <!-- Dynamic cost summary injected here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Console / CLI Command Runner -->
+      <div class="console-section">
+        <div class="section-title">
+          <span>CodexBar CLI Terminal</span>
+        </div>
+        <div class="console-input-wrapper">
+          <span class="console-prefix">codexbar</span>
+          <input type="text" id="console-input" class="console-input" placeholder="config enable --provider claude..." />
+        </div>
+        <div id="console-output" class="console-output"></div>
+      </div>
+    </div>
+  </body>
+</html>
