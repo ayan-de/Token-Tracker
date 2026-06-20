@@ -429,3 +429,204 @@ header {
   border-top-color: var(--accent-cyan);
   animation: spin 1s ease-in-out infinite;
 }
+
+/* Installation Screen Overlay */
+.install-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 11, 13, 0.96);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  z-index: 1000;
+  text-align: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.install-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 330px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.install-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--accent-cyan);
+  background: rgba(22, 211, 180, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.install-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.install-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+.install-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.install-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.btn-primary {
+  background: linear-gradient(to right, var(--accent-cyan), var(--accent-purple));
+  color: #000;
+  font-weight: 600;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 211, 180, 0.25);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-primary:disabled {
+  background: var(--text-muted);
+  color: rgba(0,0,0,0.5);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.install-progress-container {
+  width: 100%;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.install-progress-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.install-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.install-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent-cyan);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.install-progress-fill.installing {
+  width: 100%;
+  animation: progressPulse 1.5s infinite linear;
+}
+
+@keyframes progressPulse {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.install-log {
+  width: 100%;
+  height: 70px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--accent-cyan);
+  overflow-y: auto;
+  text-align: left;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+/* Antigravity Custom Avatar Background Gradient */
+.provider-avatar.antigravity {
+  background: linear-gradient(135deg, #ec4899, #db2777);
+}
+
+.error-banner {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid var(--status-danger);
+  color: #f87171;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+  display: none;
+}
+
+

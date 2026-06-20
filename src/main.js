@@ -1,99 +1,7 @@
 const { invoke } = window.__TAURI__.core;
 
-// Mock Data for Demo Mode
-const MOCK_USAGE = [
-  {
-    "provider": "claude",
-    "provider_label": "Claude",
-    "used": 42,
-    "limit": 100,
-    "unit": "requests",
-    "percentage": 42.0,
-    "resets_at": new Date(Date.now() + 3.4 * 60 * 60 * 1000).toISOString(),
-    "pacing": {
-      "stage": "onTrack",
-      "deltaPercent": -1.5
-    }
-  },
-  {
-    "provider": "codex",
-    "provider_label": "Codex",
-    "used": 38200,
-    "limit": 50000,
-    "unit": "tokens",
-    "percentage": 76.4,
-    "resets_at": new Date(Date.now() + 8.1 * 60 * 60 * 1000).toISOString(),
-    "pacing": {
-      "stage": "slightlyBehind",
-      "deltaPercent": 4.2
-    }
-  },
-  {
-    "provider": "gemini",
-    "provider_label": "Gemini",
-    "used": 14,
-    "limit": 15,
-    "unit": "requests",
-    "percentage": 93.3,
-    "resets_at": new Date(Date.now() + 0.4 * 60 * 60 * 1000).toISOString(),
-    "pacing": {
-      "stage": "behind",
-      "deltaPercent": 15.3
-    }
-  },
-  {
-    "provider": "openai",
-    "provider_label": "OpenAI",
-    "used": 1250,
-    "limit": 10000,
-    "unit": "tokens",
-    "percentage": 12.5,
-    "resets_at": new Date(Date.now() + 24.5 * 60 * 60 * 1000).toISOString(),
-    "pacing": {
-      "stage": "ahead",
-      "deltaPercent": -12.4
-    }
-  }
-];
-
-const MOCK_COST = [
-  {
-    "provider": "claude",
-    "totalCostUSD": 2.45,
-    "last30DaysCostUSD": 14.82,
-    "modelBreakdowns": [
-      {
-        "modelName": "claude-3-5-sonnet",
-        "costUSD": 11.24,
-        "totalTokens": 320000
-      },
-      {
-        "modelName": "claude-3-opus",
-        "costUSD": 3.58,
-        "totalTokens": 45000
-      }
-    ]
-  },
-  {
-    "provider": "codex",
-    "totalCostUSD": 0.85,
-    "last30DaysCostUSD": 4.12,
-    "modelBreakdowns": [
-      {
-        "modelName": "codex-flash",
-        "costUSD": 3.12,
-        "totalTokens": 624000
-      },
-      {
-        "modelName": "codex-pro",
-        "costUSD": 1.00,
-        "totalTokens": 50000
-      }
-    ]
-  }
-];
-
 let isRefreshing = false;
+let isInstalling = false;
 
 // Format countdown timers
 function formatTimeUntil(isoString) {
@@ -124,34 +32,71 @@ function formatPacingStage(stage) {
 
 // Normalize raw CLI usage data into UI-friendly structure
 function mapCLIUsage(cliItem) {
+  // Graceful fallback for Claude on Linux
+  if (cliItem.provider === "claude" && cliItem.error) {
+    const errorMsg = cliItem.error.message || "";
+    const msg = errorMsg.includes("web support")
+      ? "Requires --source cli on Linux"
+      : "Active (No session data)";
+    return {
+      provider: "claude",
+      provider_label: "Claude",
+      percentage: 0,
+      used: null,
+      limit: null,
+      unit: "requests",
+      resets_at: null,
+      pacing: { stage: "onTrack" },
+      status_message: msg
+    };
+  }
+
+  // Graceful fallback for OpenCode Go on Linux
+  if (cliItem.provider === "opencodego" && cliItem.error && cliItem.error.message.includes("not detected")) {
+    return {
+      provider: "opencodego",
+      provider_label: "OpenCode Go",
+      percentage: 0,
+      used: null,
+      limit: null,
+      unit: "requests",
+      resets_at: null,
+      pacing: { stage: "onTrack" },
+      status_message: "Not active (Run 'opencode login')"
+    };
+  }
+
+  // Skip other providers with errors (no usage data)
+  if (!cliItem.usage || !cliItem.usage.primary) {
+    return null;
+  }
+
   const provider = cliItem.provider || "unknown";
-  
+
   // Capitalize provider label
-  let provider_label = cliItem.provider_label || 
+  let provider_label = cliItem.provider_label ||
     (provider.charAt(0).toUpperCase() + provider.slice(1));
-  
+
   let percentage = 0;
   let used = null;
   let limit = null;
   let unit = "requests";
   let resets_at = null;
   let pacingStage = "onTrack";
-  
-  if (cliItem.usage && cliItem.usage.primary) {
-    const pri = cliItem.usage.primary;
-    percentage = pri.usedPercent ?? 0;
-    resets_at = pri.resetsAt;
-    used = pri.used ?? null;
-    limit = pri.limit ?? null;
-    unit = pri.unit ?? "requests";
-    
-    if (pri.pacing) {
-      pacingStage = pri.pacing.stage || "onTrack";
-    } else if (cliItem.usage.pacing) {
-      pacingStage = cliItem.usage.pacing.stage || "onTrack";
-    }
+
+  const pri = cliItem.usage.primary;
+  percentage = pri.usedPercent ?? 0;
+  resets_at = pri.resetsAt;
+  used = pri.used ?? null;
+  limit = pri.limit ?? null;
+  unit = pri.unit ?? "requests";
+
+  if (pri.pacing) {
+    pacingStage = pri.pacing.stage || "onTrack";
+  } else if (cliItem.usage.pacing) {
+    pacingStage = cliItem.usage.pacing.stage || "onTrack";
   }
-  
+
   return {
     provider,
     provider_label,
@@ -199,61 +144,120 @@ function mapCLICost(cliItem) {
   };
 }
 
-// Fetch both Quota Usage & Cost Spend data
-async function syncData() {
-  if (isRefreshing) return;
-  isRefreshing = true;
-  
-  const refreshBtn = document.getElementById("refresh-btn");
-  refreshBtn.classList.add("spinning");
+// Error presentation helpers
+function showError(message) {
+  const banner = document.getElementById("error-banner");
+  banner.textContent = message;
+  banner.style.display = "block";
+}
 
+function clearError() {
+  const banner = document.getElementById("error-banner");
+  banner.style.display = "none";
+  banner.textContent = "";
+}
+
+// Fetch both Quota Usage & Cost Spend data from the local cache file
+async function syncData() {
   const statusDot = document.getElementById("status-dot");
   const statusText = document.getElementById("status-text");
+  const installOverlay = document.getElementById("install-overlay");
   
   try {
     const cliStatus = await invoke("get_cli_status");
     let usageData, costData;
 
     if (cliStatus.status === "available") {
+      installOverlay.style.display = "none";
       statusDot.className = "badge-dot running";
-      statusText.textContent = "CLI Active";
+      statusText.textContent = "CLI Connected";
       
       try {
         const rawUsage = await invoke("get_usage_data");
         const rawCost = await invoke("get_cost_data");
         
-        usageData = rawUsage.map(mapCLIUsage);
-        costData = rawCost.map(mapCLICost);
+        usageData = rawUsage.map(mapCLIUsage).filter(p => p !== null);
+        costData = rawCost.map(mapCLICost).filter(c => c !== null);
+        
+        clearError();
+        renderUsage(usageData);
+        renderCost(costData);
       } catch (err) {
-        console.warn("Direct CLI fetch failed, falling back to demo mode", err);
-        statusDot.className = "badge-dot demo";
-        statusText.textContent = "Demo Mode";
-        usageData = MOCK_USAGE;
-        costData = MOCK_COST;
+        console.warn("Loading cached CLI data failed", err);
+        showError("Failed to load cached data: " + err);
+        renderUsage([]);
+        renderCost([]);
       }
+    } else if (cliStatus.status === "not_installed") {
+      installOverlay.style.display = "flex";
+      statusDot.className = "badge-dot";
+      statusText.textContent = "Not Installed";
+      renderUsage([]);
+      renderCost([]);
     } else {
-      statusDot.className = "badge-dot demo";
-      statusText.textContent = "Demo Mode";
-      usageData = MOCK_USAGE;
-      costData = MOCK_COST;
+      installOverlay.style.display = "none";
+      statusDot.className = "badge-dot";
+      statusText.textContent = "CLI Error";
+      showError("CodexBar CLI error. Verify CLI version using 'codexbar --version'.");
+      renderUsage([]);
+      renderCost([]);
     }
-
-    renderUsage(usageData);
-    renderCost(costData);
 
   } catch (error) {
     console.error("Sync error:", error);
-    renderUsage(MOCK_USAGE);
-    renderCost(MOCK_COST);
+    showError("Tauri backend sync error: " + error);
   } finally {
     document.getElementById("loader").style.display = "none";
     document.getElementById("providers-container").style.display = "block";
     document.getElementById("cost-container").style.display = "block";
-    
+  }
+}
+
+// Trigger background CLI sync
+async function refreshData() {
+  if (isRefreshing) return;
+  
+  const cliStatus = await invoke("get_cli_status");
+  if (cliStatus.status !== "available") {
+    // Only refresh if CLI is available
+    return;
+  }
+
+  isRefreshing = true;
+  const refreshBtn = document.getElementById("refresh-btn");
+  refreshBtn.classList.add("spinning");
+
+  try {
+    await invoke("trigger_refresh");
+  } catch (error) {
+    console.error("Failed to trigger background refresh:", error);
+    showError("Failed to trigger refresh: " + error);
     isRefreshing = false;
     refreshBtn.classList.remove("spinning");
   }
 }
+
+// Listen to data-synced event from Tauri backend
+window.__TAURI__.event.listen("data-synced", (event) => {
+  const payload = event.payload;
+  const usageData = (payload.usage || []).map(mapCLIUsage).filter(p => p !== null);
+  const costData = (payload.cost || []).map(mapCLICost).filter(c => c !== null);
+
+  clearError();
+  renderUsage(usageData);
+  renderCost(costData);
+
+  isRefreshing = false;
+  document.getElementById("refresh-btn").classList.remove("spinning");
+});
+
+// Listen to sync-error event from Tauri backend
+window.__TAURI__.event.listen("sync-error", (event) => {
+  const errMsg = event.payload;
+  showError("Failed to sync from CLI: " + errMsg);
+  isRefreshing = false;
+  document.getElementById("refresh-btn").classList.remove("spinning");
+});
 
 // Render quota progress bars
 function renderUsage(providers) {
@@ -284,9 +288,11 @@ function renderUsage(providers) {
          </span>`
       : "";
 
-    const labelText = (p.used !== null && p.limit !== null)
-      ? `${p.used.toLocaleString()} / ${p.limit.toLocaleString()} ${p.unit}`
-      : `${fillPercent.toFixed(1)}% used`;
+    const labelText = p.status_message 
+      ? p.status_message
+      : (p.used !== null && p.limit !== null)
+        ? `${p.used.toLocaleString()} / ${p.limit.toLocaleString()} ${p.unit}`
+        : `${fillPercent.toFixed(1)}% used`;
 
     const pacingStage = p.pacing?.stage || "onTrack";
     const pacingClass = pacingStage.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
@@ -381,23 +387,76 @@ async function executeCLICommand(cmdText) {
     const result = await invoke("run_codexbar_command", { args });
     outputEl.textContent = result || "Command completed successfully (no output).";
     // Sync data again in case configurations changed (e.g., enabled a provider)
-    setTimeout(syncData, 500);
+    setTimeout(refreshData, 500);
   } catch (error) {
     outputEl.className = "console-output error";
     outputEl.textContent = error;
   }
 }
 
+// Run CLI installation helper
+async function startInstaller() {
+  if (isInstalling) return;
+  isInstalling = true;
+
+  const installBtn = document.getElementById("install-cli-btn");
+  const progressContainer = document.getElementById("install-progress-container");
+  const progressText = document.getElementById("install-progress-text");
+  const logEl = document.getElementById("install-log");
+
+  installBtn.disabled = true;
+  progressContainer.style.display = "flex";
+  logEl.textContent = "";
+
+  // Listen to install-progress events from Tauri backend
+  const unlisten = await window.__TAURI__.event.listen("install-progress", (event) => {
+    const msg = event.payload;
+    progressText.textContent = msg;
+    logEl.textContent += `[installer] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  });
+
+  try {
+    const result = await invoke("install_cli");
+    logEl.textContent += `[installer] Success: ${result}\n`;
+    progressText.textContent = "Successfully installed!";
+    
+    // Hide overlay after a brief delay and trigger data sync
+    setTimeout(() => {
+      document.getElementById("install-overlay").style.display = "none";
+      isInstalling = false;
+      installBtn.disabled = false;
+      progressContainer.style.display = "none";
+      unlisten();
+      refreshData();
+    }, 1500);
+
+  } catch (error) {
+    console.error("Installation failed:", error);
+    logEl.className = "install-log error";
+    logEl.textContent += `[installer] Error: ${error}\n`;
+    progressText.textContent = "Installation failed. Please retry.";
+    
+    installBtn.disabled = false;
+    isInstalling = false;
+    unlisten();
+  }
+}
+
 // Startup Initialization
 window.addEventListener("DOMContentLoaded", () => {
-  // Sync immediately
-  syncData();
+  // Load cache immediately
+  syncData().then(() => {
+    // Trigger fresh sync in background
+    refreshData();
+  });
 
   // Polling loop (every 60 seconds)
-  setInterval(syncData, 60000);
+  setInterval(refreshData, 60000);
 
   // Bind Actions
-  document.getElementById("refresh-btn").addEventListener("click", syncData);
+  document.getElementById("refresh-btn").addEventListener("click", refreshData);
+  document.getElementById("install-cli-btn").addEventListener("click", startInstaller);
 
   // Command input handler
   const consoleInput = document.getElementById("console-input");
@@ -408,3 +467,5 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+

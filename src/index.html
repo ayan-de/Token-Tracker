@@ -15,8 +15,8 @@
         <div class="brand">
           <h1>CodexBar</h1>
           <div id="server-status" class="server-badge">
-            <span id="status-dot" class="badge-dot demo"></span>
-            <span id="status-text">Demo Mode</span>
+            <span id="status-dot" class="badge-dot"></span>
+            <span id="status-text">Connecting...</span>
           </div>
         </div>
         <div class="actions">
@@ -30,6 +30,9 @@
 
       <!-- Main Content Area -->
       <div id="main-content">
+        <!-- Error Banner -->
+        <div id="error-banner" class="error-banner"></div>
+
         <!-- Loader -->
         <div id="loader" class="loader-container">
           <div class="spinner"></div>
@@ -67,6 +70,37 @@
           <input type="text" id="console-input" class="console-input" placeholder="config enable --provider claude..." />
         </div>
         <div id="console-output" class="console-output"></div>
+      </div>
+
+      <!-- CLI Installer Screen Overlay -->
+      <div id="install-overlay" class="install-overlay" style="display: none;">
+        <div class="install-card">
+          <div class="install-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </div>
+          <div class="install-title">CodexBar CLI Not Found</div>
+          <div class="install-desc">
+            The CodexBar CLI is required to retrieve active provider quotas and costs from your local system.
+          </div>
+          <div class="install-actions">
+            <button id="install-cli-btn" class="btn-primary">
+              <svg xmlns="http://www.w3.org/2000/svg" style="width:16px;height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Install CodexBar CLI
+            </button>
+          </div>
+          <!-- Progress Info -->
+          <div id="install-progress-container" class="install-progress-container">
+            <div id="install-progress-text" class="install-progress-text">Initializing...</div>
+            <div class="install-progress-bar">
+              <div id="install-progress-fill" class="install-progress-fill installing"></div>
+            </div>
+            <div id="install-log" class="install-log"></div>
+          </div>
+        </div>
       </div>
     </div>
   </body>
