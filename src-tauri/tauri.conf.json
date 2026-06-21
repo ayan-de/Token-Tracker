@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.ayan-de.tauri-app",
   "build": {
-    "frontendDist": "../src"
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../out"
   },
   "app": {
     "withGlobalTauri": true,
