@@ -76,7 +76,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-border-subtle bg-secondary/20 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <h1 className="text-xs font-black tracking-wider bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple bg-clip-text text-transparent font-outfit uppercase">
-                CodexBar
+                TokenTracker
               </h1>
               <span 
                 className={`w-1.5 h-1.5 rounded-full ${
@@ -247,7 +247,7 @@ export default function HomePage() {
                 )}
               </div>
               <p className="text-[10px] text-text-muted/70">
-                After exporting variables, run a refresh or restart CodexBar to apply.
+                After exporting variables, run a refresh or restart TokenTracker to apply.
               </p>
             </div>
             
@@ -318,14 +318,14 @@ export default function HomePage() {
           <div className="w-[320px] bg-secondary border border-border-subtle rounded-xl p-4 shadow-2xl text-center space-y-4">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-cyan via-accent-blue to-accent-purple flex items-center justify-center shadow-lg shadow-accent-blue/20 text-white font-extrabold text-lg tracking-wider mb-2 font-outfit">
-                CB
+                TT
               </div>
-              <h3 className="text-sm font-bold text-text-main leading-tight">CodexBar Desktop</h3>
+              <h3 className="text-sm font-bold text-text-main leading-tight">TokenTracker Desktop</h3>
               <span className="text-[10px] text-text-muted">v0.1.0 (Beta) - Linux client</span>
             </div>
             
             <p className="text-xs text-text-muted/85 leading-relaxed font-outfit max-w-[260px] mx-auto">
-              A premium cross-platform port of CodexBar for monitoring LLM quota, rate limit, and spend statistics. Original macOS app by Peter Steinberger.
+              A premium cross-platform port of CodexBar (TokenTracker) for monitoring LLM quota, rate limit, and spend statistics. Original macOS app by Peter Steinberger.
             </p>
             
             <button

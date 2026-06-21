@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "CodexBar",
+        "title": "TokenTracker",
         "width": 380,
         "height": 550,
         "resizable": false,

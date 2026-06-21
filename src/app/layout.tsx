@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "CodexBar",
+  title: "TokenTracker",
   description: "AI Provider Quota & Cost Monitor",
 };
 

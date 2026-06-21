@@ -313,12 +313,12 @@ export default function ProviderDetail({
           <span>Settings...</span>
         </button>
 
-        {/* About CodexBar */}
+        {/* About TokenTracker */}
         <button
           onClick={onOpenAboutModal}
           className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-text-main focus:outline-none"
         >
-          <span>About CodexBar</span>
+          <span>About TokenTracker</span>
         </button>
 
         {/* Quit */}
