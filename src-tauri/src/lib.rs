@@ -5,6 +5,12 @@ use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::Emitter;
 use tauri::Manager;
 
+fn get_home_dir() -> Option<PathBuf> {
+    env::var_os("HOME")
+        .or_else(|| env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+}
+
 fn find_cli_path() -> Option<PathBuf> {
     // 1. Check if the environment variable CODEXBAR_BIN is set
     if let Ok(env_path) = env::var("CODEXBAR_BIN") {
@@ -17,40 +23,48 @@ fn find_cli_path() -> Option<PathBuf> {
     // 2. Check PATH environment variable
     if let Some(paths) = env::var_os("PATH") {
         for path in env::split_paths(&paths) {
-            let p1 = path.join("codexbar");
-            if p1.exists() && p1.is_file() {
-                return Some(p1);
-            }
-            let p2 = path.join("CodexBarCLI");
-            if p2.exists() && p2.is_file() {
-                return Some(p2);
+            let names = if cfg!(windows) {
+                vec!["codexbar.exe", "CodexBarCLI.exe"]
+            } else {
+                vec!["codexbar", "CodexBarCLI"]
+            };
+            for name in names {
+                let p = path.join(name);
+                if p.exists() && p.is_file() {
+                    return Some(p);
+                }
             }
         }
     }
 
     // 3. Check home directory ~/.local/bin/
-    if let Some(home_dir) = env::var_os("HOME").map(PathBuf::from) {
-        let p1 = home_dir.join(".local").join("bin").join("CodexBarCLI");
-        if p1.exists() && p1.is_file() {
-            return Some(p1);
-        }
-        let p2 = home_dir.join(".local").join("bin").join("codexbar");
-        if p2.exists() && p2.is_file() {
-            return Some(p2);
+    if let Some(home_dir) = get_home_dir() {
+        let names = if cfg!(windows) {
+            vec!["CodexBarCLI.exe", "codexbar.exe"]
+        } else {
+            vec!["CodexBarCLI", "codexbar"]
+        };
+        for name in names {
+            let p = home_dir.join(".local").join("bin").join(name);
+            if p.exists() && p.is_file() {
+                return Some(p);
+            }
         }
     }
 
-    // 4. Check absolute standard paths
-    let standard_paths = [
-        "/usr/local/bin/CodexBarCLI",
-        "/usr/local/bin/codexbar",
-        "/usr/bin/CodexBarCLI",
-        "/usr/bin/codexbar",
-    ];
-    for &p in &standard_paths {
-        let path = Path::new(p);
-        if path.exists() && path.is_file() {
-            return Some(path.to_path_buf());
+    // 4. Check absolute standard paths (non-Windows only)
+    if !cfg!(windows) {
+        let standard_paths = [
+            "/usr/local/bin/CodexBarCLI",
+            "/usr/local/bin/codexbar",
+            "/usr/bin/CodexBarCLI",
+            "/usr/bin/codexbar",
+        ];
+        for &p in &standard_paths {
+            let path = Path::new(p);
+            if path.exists() && path.is_file() {
+                return Some(path.to_path_buf());
+            }
         }
     }
 
@@ -64,7 +78,16 @@ fn executable_exists(names: &[&str]) -> bool {
     env::split_paths(&paths).any(|directory| {
         names.iter().any(|name| {
             let candidate = directory.join(name);
-            candidate.is_file()
+            if candidate.is_file() {
+                return true;
+            }
+            if cfg!(windows) {
+                let win_candidate = directory.join(format!("{}.exe", name));
+                if win_candidate.is_file() {
+                    return true;
+                }
+            }
+            false
         })
     })
 }
@@ -160,10 +183,9 @@ async fn get_cli_status() -> Result<serde_json::Value, String> {
 }
 
 fn get_cache_path() -> Option<PathBuf> {
-    let home = env::var("HOME").ok()?;
+    let home = get_home_dir()?;
     Some(
-        Path::new(&home)
-            .join(".codexbar-desktop")
+        home.join(".codexbar-desktop")
             .join("cache.json"),
     )
 }
@@ -485,13 +507,17 @@ async fn get_cost_data() -> Result<serde_json::Value, String> {
 
 #[tauri::command]
 async fn install_cli(app: tauri::AppHandle) -> Result<String, String> {
+    if cfg!(windows) {
+        return Err("Automatic CLI installation is only supported on Linux. Please install CodexBar CLI on Windows manually and ensure it is in your PATH.".to_string());
+    }
+
     let _ = app.emit("install-progress", "Starting installation...");
 
-    let home = match env::var("HOME") {
-        Ok(h) => h,
-        Err(_) => return Err("HOME environment variable not set".to_string()),
+    let home = match get_home_dir() {
+        Some(h) => h,
+        None => return Err("Home directory not found".to_string()),
     };
-    let bin_dir = Path::new(&home).join(".local").join("bin");
+    let bin_dir = home.join(".local").join("bin");
 
     if !bin_dir.exists() {
         let _ = app.emit("install-progress", "Creating directory ~/.local/bin...");
