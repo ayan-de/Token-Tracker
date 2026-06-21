@@ -40,6 +40,20 @@
   --hover-subtle: rgba(0, 0, 0, 0.06);
 }
 
+button {
+  background: none;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button:focus, button:active, button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 body {
   background-color: var(--color-primary);
   color: var(--color-text-main);

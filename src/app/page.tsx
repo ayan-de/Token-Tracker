@@ -90,7 +90,7 @@ export default function HomePage() {
               {/* Theme Mode Toggle Button */}
               <button
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all cursor-pointer"
+                className="p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all cursor-pointer border-0 outline-none focus:outline-none"
                 title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {theme === 'dark' ? (
@@ -108,7 +108,7 @@ export default function HomePage() {
               <button
                 onClick={refreshData}
                 disabled={isRefreshing}
-                className={`p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all cursor-pointer ${
+                className={`p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all cursor-pointer border-0 outline-none focus:outline-none ${
                   isRefreshing ? "animate-spin text-accent-blue" : ""
                 }`}
                 title="Refresh AI quotas"
@@ -141,7 +141,7 @@ export default function HomePage() {
                   <button
                     key={p.provider}
                     onClick={() => setSelectedProvider(p.provider)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer border-0 outline-none focus:outline-none ${
                       isSelected
                         ? "bg-accent-blue text-white shadow-md shadow-accent-blue/15 scale-[1.03]"
                         : "bg-bg-subtle text-text-muted hover:text-text-main hover:bg-hover-subtle"
