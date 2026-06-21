@@ -26,7 +26,7 @@ You can install and run TokenTracker on Linux using a simple terminal command.
 #### Option 1: Standalone AppImage (Recommended)
 Download and execute the portable executable:
 ```bash
-curl -LO https://github.com/ayan-de/codexbar-desktop/releases/latest/download/TokenTracker.AppImage
+curl -LO https://github.com/ayan-de/Token-Tracker/releases/latest/download/TokenTracker.AppImage
 chmod +x TokenTracker.AppImage
 ./TokenTracker.AppImage
 ```
@@ -34,7 +34,7 @@ chmod +x TokenTracker.AppImage
 #### Option 2: Debian/Ubuntu package (.deb)
 Download and install the Debian archive:
 ```bash
-curl -LO https://github.com/ayan-de/codexbar-desktop/releases/latest/download/TokenTracker.deb
+curl -LO https://github.com/ayan-de/Token-Tracker/releases/latest/download/TokenTracker.deb
 sudo dpkg -i TokenTracker.deb
 ```
 
@@ -42,7 +42,7 @@ sudo dpkg -i TokenTracker.deb
 
 ### 🪟 Windows Installation
 
-1. Navigate to the [TokenTracker Releases](https://github.com/ayan-de/codexbar-desktop/releases) page.
+1. Navigate to the [TokenTracker Releases](https://github.com/ayan-de/Token-Tracker/releases) page.
 2. Download the installer file corresponding to your architecture (e.g., `TokenTracker_x64_en-US.msi` or the portable `TokenTracker.exe`).
 3. Double-click the downloaded file and follow the onscreen setup wizard.
 
