@@ -158,7 +158,7 @@ export default function ProviderDetail({
             </span>
             <button
               onClick={() => onOpenAddAccountModal(p.provider)}
-              className="mt-3 px-3 py-1 bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25 text-xs font-medium rounded-lg border border-accent-blue/20 transition-all cursor-pointer"
+              className="mt-3 px-3 py-1 bg-accent-blue/15 text-accent-blue hover:bg-accent-blue/25 text-xs font-medium rounded-lg border border-accent-blue/20 transition-all cursor-pointer focus:bg-accent-blue/25 focus:text-accent-blue focus:outline-none"
             >
               Add Account...
             </button>
@@ -231,7 +231,7 @@ export default function ProviderDetail({
         <div className="py-2.5 border-b border-border-subtle">
           <button
             onClick={() => setCostExpanded(!costExpanded)}
-            className="w-full flex items-center justify-between group hover:text-text-main transition-colors text-left cursor-pointer"
+            className="w-full flex items-center justify-between group hover:text-text-main transition-colors text-left cursor-pointer focus:bg-transparent focus:outline-none"
           >
             <div className="flex flex-col">
               <span className="text-xs font-semibold text-text-main group-hover:text-accent-blue transition-colors">Cost</span>
@@ -273,7 +273,7 @@ export default function ProviderDetail({
         {/* Add Account... */}
         <button
           onClick={() => onOpenAddAccountModal(p.provider)}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-text-main focus:outline-none"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -284,7 +284,7 @@ export default function ProviderDetail({
         {/* Usage Dashboard */}
         <button
           onClick={() => handleOpenUrl(urls.dashboard)}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-text-main focus:outline-none"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -295,7 +295,7 @@ export default function ProviderDetail({
         {/* Status Page */}
         <button
           onClick={() => handleOpenUrl(urls.statusPage)}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-text-main focus:outline-none"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -308,7 +308,7 @@ export default function ProviderDetail({
         {/* Settings... */}
         <button
           onClick={onOpenSettingsModal}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-text-main focus:outline-none"
         >
           <span>Settings...</span>
         </button>
@@ -316,7 +316,7 @@ export default function ProviderDetail({
         {/* About CodexBar */}
         <button
           onClick={onOpenAboutModal}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-text-main focus:outline-none"
         >
           <span>About CodexBar</span>
         </button>
@@ -324,7 +324,7 @@ export default function ProviderDetail({
         {/* Quit */}
         <button
           onClick={handleQuit}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-status-danger transition-all text-left cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-status-danger transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-status-danger focus:outline-none"
         >
           <span>Quit</span>
         </button>

@@ -78,5 +78,5 @@ export const PROVIDER_GRADIENTS: Record<string, string> = {
 };
 
 export function getProviderGradient(provider: string): string {
-  return PROVIDER_GRADIENTS[provider] ?? "from-gray-500 to-gray-600";
+  return PROVIDER_GRADIENTS[provider.toLowerCase()] ?? "from-gray-500 to-gray-600";
 }
