@@ -21,6 +21,7 @@ export default function HomePage() {
 
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   // Modals state
   const [addAccountProvider, setAddAccountProvider] = useState<string | null>(null);
@@ -28,6 +29,25 @@ export default function HomePage() {
   const [aboutOpen, setAboutOpen] = useState(false);
 
   const showInstallOverlay = cliStatus.status === "not_installed";
+
+  // Load theme preference on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as 'dark' | 'light' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  // Update theme class on HTML element when theme changes
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light-mode');
+    } else {
+      root.classList.remove('light-mode');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   // Default select first provider when data loads
   useEffect(() => {
@@ -53,7 +73,7 @@ export default function HomePage() {
         
         {/* App Title & Refresh Bar */}
         {!showInstallOverlay && (
-          <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-white/5 bg-secondary/20 backdrop-blur-sm">
+          <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-border-subtle bg-secondary/20 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               <h1 className="text-xs font-black tracking-wider bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple bg-clip-text text-transparent font-outfit uppercase">
                 CodexBar
@@ -66,18 +86,38 @@ export default function HomePage() {
               />
             </div>
             
-            <button
-              onClick={refreshData}
-              disabled={isRefreshing}
-              className={`p-1 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-text-main transition-all ${
-                isRefreshing ? "animate-spin text-accent-blue" : ""
-              }`}
-              title="Refresh AI quotas"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-1.5">
+              {/* Theme Mode Toggle Button */}
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all"
+                title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              >
+                {theme === 'dark' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                  </svg>
+                )}
+              </button>
+
+              {/* Refresh Button */}
+              <button
+                onClick={refreshData}
+                disabled={isRefreshing}
+                className={`p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all ${
+                  isRefreshing ? "animate-spin text-accent-blue" : ""
+                }`}
+                title="Refresh AI quotas"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
 
@@ -93,7 +133,7 @@ export default function HomePage() {
         ) : (
           <>
             {/* Horizontal Tabs Switcher (like macOS popover top tab list) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto px-4 py-2.5 border-b border-white/5 bg-secondary/10 scrollbar-none">
+            <div className="flex items-center gap-1.5 overflow-x-auto px-4 py-2.5 border-b border-border-subtle bg-secondary/10 scrollbar-none">
               {providers.map((p) => {
                 const isSelected = selectedProvider === p.provider;
                 const desc = PROVIDER_DESCRIPTORS[p.provider.toLowerCase()] || { displayName: p.provider_label };
@@ -104,7 +144,7 @@ export default function HomePage() {
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 ${
                       isSelected
                         ? "bg-accent-blue text-white shadow-md shadow-accent-blue/15 scale-[1.03]"
-                        : "bg-white/5 text-text-muted hover:text-text-main hover:bg-white/10"
+                        : "bg-bg-subtle text-text-muted hover:text-text-main hover:bg-hover-subtle"
                     }`}
                   >
                     <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
@@ -129,7 +169,7 @@ export default function HomePage() {
 
         {/* Collapsible Terminal Drawer */}
         {!showInstallOverlay && (
-          <div className="flex flex-col border-t border-white/5 bg-secondary/20 backdrop-blur-md">
+          <div className="flex flex-col border-t border-border-subtle bg-secondary/20 backdrop-blur-md">
             <button
               onClick={() => setTerminalOpen(!terminalOpen)}
               className="flex items-center justify-center gap-1.5 py-1.5 text-text-muted hover:text-text-main text-[10px] font-bold tracking-wide uppercase transition-colors"
@@ -161,8 +201,8 @@ export default function HomePage() {
       {/* Add Account Modal */}
       {addAccountProvider && (
         <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-[320px] bg-secondary border border-white/10 rounded-xl p-4 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+          <div className="w-[320px] bg-secondary border border-border-subtle rounded-xl p-4 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 border-b border-border-subtle pb-2">
               <span className={`w-3 h-3 rounded-full bg-gradient-to-br ${getProviderGradient(addAccountProvider)}`} />
               <h3 className="text-sm font-bold text-text-main">
                 Configure {PROVIDER_DESCRIPTORS[addAccountProvider.toLowerCase()]?.displayName || addAccountProvider}
@@ -172,7 +212,7 @@ export default function HomePage() {
             <div className="text-xs text-text-muted space-y-2 leading-relaxed font-outfit">
               <p>To configure this provider, you can set the environment credentials or login via the CLI.</p>
               
-              <div className="bg-primary/50 p-2 rounded-lg border border-white/5 font-fira text-[11px] text-accent-cyan break-all">
+              <div className="bg-primary/50 p-2 rounded-lg border border-border-subtle font-fira text-[11px] text-accent-cyan break-all">
                 {addAccountProvider.toLowerCase() === "claude" && (
                   <>
                     export ANTHROPIC_API_KEY="..."<br />
@@ -213,7 +253,7 @@ export default function HomePage() {
             
             <button
               onClick={() => setAddAccountProvider(null)}
-              className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-xs font-semibold rounded-lg text-text-main border border-white/10 transition-colors"
+              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors"
             >
               Done
             </button>
@@ -224,13 +264,24 @@ export default function HomePage() {
       {/* Settings Modal */}
       {settingsOpen && (
         <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-[320px] bg-secondary border border-white/10 rounded-xl p-4 shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-text-main border-b border-white/5 pb-2">Settings</h3>
+          <div className="w-[320px] bg-secondary border border-border-subtle rounded-xl p-4 shadow-2xl space-y-4">
+            <h3 className="text-sm font-bold text-text-main border-b border-border-subtle pb-2">Settings</h3>
             
             <div className="space-y-3 text-xs text-text-muted font-outfit">
               <div className="flex items-center justify-between">
+                <span>Theme Mode</span>
+                <select 
+                  value={theme}
+                  onChange={(e) => setTheme(e.target.value as 'dark' | 'light')}
+                  className="bg-primary border border-border-subtle rounded px-2 py-1 text-text-main focus:outline-none"
+                >
+                  <option value="dark">Dark Theme</option>
+                  <option value="light">Light Theme</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between">
                 <span>Refresh Interval</span>
-                <select className="bg-primary border border-white/10 rounded px-2 py-1 text-text-main focus:outline-none">
+                <select className="bg-primary border border-border-subtle rounded px-2 py-1 text-text-main focus:outline-none">
                   <option>Every 1 minute</option>
                   <option>Every 5 minutes</option>
                   <option>Manual only</option>
@@ -246,14 +297,14 @@ export default function HomePage() {
                   type="checkbox" 
                   checked={terminalOpen} 
                   onChange={(e) => setTerminalOpen(e.target.checked)}
-                  className="rounded border-white/10 bg-primary accent-accent-blue focus:ring-0 w-3.5 h-3.5"
+                  className="rounded border-border-subtle bg-primary accent-accent-blue focus:ring-0 w-3.5 h-3.5"
                 />
               </div>
             </div>
             
             <button
               onClick={() => setSettingsOpen(false)}
-              className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-xs font-semibold rounded-lg text-text-main border border-white/10 transition-colors"
+              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors"
             >
               Close
             </button>
@@ -264,7 +315,7 @@ export default function HomePage() {
       {/* About Modal */}
       {aboutOpen && (
         <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-[320px] bg-secondary border border-white/10 rounded-xl p-4 shadow-2xl text-center space-y-4">
+          <div className="w-[320px] bg-secondary border border-border-subtle rounded-xl p-4 shadow-2xl text-center space-y-4">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-cyan via-accent-blue to-accent-purple flex items-center justify-center shadow-lg shadow-accent-blue/20 text-white font-extrabold text-lg tracking-wider mb-2 font-outfit">
                 CB
@@ -279,7 +330,7 @@ export default function HomePage() {
             
             <button
               onClick={() => setAboutOpen(false)}
-              className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-xs font-semibold rounded-lg text-text-main border border-white/10 transition-colors"
+              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors"
             >
               Close
             </button>

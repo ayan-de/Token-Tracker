@@ -1,19 +1,43 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #0a0b0d;
-  --color-secondary: #12141a;
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-border-subtle: var(--border-subtle);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-hover-subtle: var(--hover-subtle);
+
   --color-accent-cyan: #16d3b4;
   --color-accent-purple: #8b5cf6;
   --color-accent-blue: #3b82f6;
   --color-status-ok: #10b981;
   --color-status-warning: #f59e0b;
   --color-status-danger: #ef4444;
-  --color-text-main: #e2e8f0;
-  --color-text-muted: #64748b;
 
   --font-family-outfit: "Outfit", sans-serif;
   --font-family-fira: "Fira Code", monospace;
+}
+
+:root {
+  --primary: #0a0b0d;
+  --secondary: #12141a;
+  --text-main: #e2e8f0;
+  --text-muted: #64748b;
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --bg-subtle: rgba(255, 255, 255, 0.05);
+  --hover-subtle: rgba(255, 255, 255, 0.08);
+}
+
+:root.light-mode {
+  --primary: #f3f4f6;
+  --secondary: #ffffff;
+  --text-main: #111827;
+  --text-muted: #556270;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --bg-subtle: rgba(0, 0, 0, 0.04);
+  --hover-subtle: rgba(0, 0, 0, 0.06);
 }
 
 body {
