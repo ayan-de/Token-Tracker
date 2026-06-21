@@ -90,7 +90,7 @@ export default function HomePage() {
               {/* Theme Mode Toggle Button */}
               <button
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all"
+                className="p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all cursor-pointer"
                 title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
               >
                 {theme === 'dark' ? (
@@ -108,7 +108,7 @@ export default function HomePage() {
               <button
                 onClick={refreshData}
                 disabled={isRefreshing}
-                className={`p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all ${
+                className={`p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all cursor-pointer ${
                   isRefreshing ? "animate-spin text-accent-blue" : ""
                 }`}
                 title="Refresh AI quotas"
@@ -141,7 +141,7 @@ export default function HomePage() {
                   <button
                     key={p.provider}
                     onClick={() => setSelectedProvider(p.provider)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer ${
                       isSelected
                         ? "bg-accent-blue text-white shadow-md shadow-accent-blue/15 scale-[1.03]"
                         : "bg-bg-subtle text-text-muted hover:text-text-main hover:bg-hover-subtle"
@@ -172,7 +172,7 @@ export default function HomePage() {
           <div className="flex flex-col border-t border-border-subtle bg-secondary/20 backdrop-blur-md">
             <button
               onClick={() => setTerminalOpen(!terminalOpen)}
-              className="flex items-center justify-center gap-1.5 py-1.5 text-text-muted hover:text-text-main text-[10px] font-bold tracking-wide uppercase transition-colors"
+              className="flex items-center justify-center gap-1.5 py-1.5 text-text-muted hover:text-text-main text-[10px] font-bold tracking-wide uppercase transition-colors cursor-pointer"
             >
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -253,7 +253,7 @@ export default function HomePage() {
             
             <button
               onClick={() => setAddAccountProvider(null)}
-              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors"
+              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors cursor-pointer"
             >
               Done
             </button>
@@ -304,7 +304,7 @@ export default function HomePage() {
             
             <button
               onClick={() => setSettingsOpen(false)}
-              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors"
+              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors cursor-pointer"
             >
               Close
             </button>
@@ -330,7 +330,7 @@ export default function HomePage() {
             
             <button
               onClick={() => setAboutOpen(false)}
-              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors"
+              className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors cursor-pointer"
             >
               Close
             </button>

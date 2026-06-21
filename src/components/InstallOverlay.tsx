@@ -85,7 +85,7 @@ export default function InstallOverlay({ onInstalled }: InstallOverlayProps) {
         id="install-cli-btn"
         onClick={handleInstall}
         disabled={isInstalling}
-        className="w-full max-w-[200px] py-2 rounded-lg bg-gradient-to-r from-accent-cyan to-accent-purple text-white text-xs font-semibold font-outfit hover:opacity-90 transition-opacity disabled:opacity-50"
+        className="w-full max-w-[200px] py-2 rounded-lg bg-gradient-to-r from-accent-cyan to-accent-purple text-white text-xs font-semibold font-outfit hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
       >
         {isInstalling ? "Installing..." : "Install CodexBar CLI"}
       </button>
