@@ -669,6 +669,11 @@ async fn install_cli(app: tauri::AppHandle) -> Result<String, String> {
     Ok("Successfully installed CodexBar CLI".to_string())
 }
 
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -709,7 +714,8 @@ pub fn run() {
             get_usage_data,
             get_cost_data,
             install_cli,
-            trigger_refresh
+            trigger_refresh,
+            quit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

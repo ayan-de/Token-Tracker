@@ -13,15 +13,59 @@ export type PacingStage =
   | "stale"
   | "unavailable";
 
+export interface RateWindow {
+  usedPercent: number;
+  windowMinutes?: number | null;
+  resetsAt?: string | null;
+  resetDescription?: string | null;
+  used?: number | null;
+  limit?: number | null;
+  unit?: string | null;
+  pacing?: { stage?: PacingStage } | null;
+}
+
+export interface NamedRateWindow {
+  id: string;
+  title: string;
+  window: RateWindow;
+  usageKnown: boolean;
+}
+
+export interface ProviderCostSnapshot {
+  used: number;
+  limit: number;
+  currencyCode: string;
+  period?: string | null;
+  resetsAt?: string | null;
+  nextRegenAmount?: number | null;
+  personalUsed?: number | null;
+  updatedAt: string;
+}
+
+export interface ProviderIdentity {
+  providerID?: string | null;
+  accountEmail?: string | null;
+  accountOrganization?: string | null;
+  loginMethod?: string | null;
+}
+
+export interface ProviderUsageDetails {
+  primary?: RateWindow | null;
+  secondary?: RateWindow | null;
+  tertiary?: RateWindow | null;
+  extraRateWindows?: NamedRateWindow[] | null;
+  providerCost?: ProviderCostSnapshot | null;
+  loginMethod?: string | null;
+  accountEmail?: string | null;
+  updatedAt?: string | null;
+  identity?: ProviderIdentity | null;
+}
+
 export interface ProviderUsage {
   provider: string;
   provider_label: string;
-  percentage: number;
-  used: number | null;
-  limit: number | null;
-  unit: string;
-  resets_at: string | null;
-  pacing: { stage: PacingStage };
+  version?: string;
+  usage?: ProviderUsageDetails | null;
   stale?: boolean;
   last_successful_at?: number | null;
   error_message: string | null;
@@ -53,19 +97,69 @@ export interface CacheData {
 export interface RawCliUsageItem {
   provider?: string;
   provider_label?: string;
-  cacheAccountKey?: string;
-  account?: string;
+  version?: string;
   usage?: {
+    loginMethod?: string;
+    accountEmail?: string;
+    updatedAt?: string;
     primary?: {
       usedPercent?: number;
+      windowMinutes?: number;
       resetsAt?: string;
+      resetDescription?: string;
       used?: number;
       limit?: number;
       unit?: string;
       pacing?: { stage?: string };
-    };
+    } | null;
+    secondary?: {
+      usedPercent?: number;
+      windowMinutes?: number;
+      resetsAt?: string;
+      resetDescription?: string;
+      used?: number;
+      limit?: number;
+      unit?: string;
+      pacing?: { stage?: string };
+    } | null;
+    tertiary?: {
+      usedPercent?: number;
+      windowMinutes?: number;
+      resetsAt?: string;
+      resetDescription?: string;
+      used?: number;
+      limit?: number;
+      unit?: string;
+      pacing?: { stage?: string };
+    } | null;
+    extraRateWindows?: Array<{
+      id: string;
+      title: string;
+      window: {
+        usedPercent: number;
+        windowMinutes?: number;
+        resetsAt?: string;
+        resetDescription?: string;
+      };
+      usageKnown?: boolean;
+    }> | null;
+    providerCost?: {
+      used: number;
+      limit: number;
+      currencyCode: string;
+      period?: string;
+      resetsAt?: string;
+      personalUsed?: number;
+      updatedAt: string;
+    } | null;
+    identity?: {
+      providerID?: string;
+      accountEmail?: string;
+      accountOrganization?: string;
+      loginMethod?: string;
+    } | null;
     pacing?: { stage?: string };
-  };
+  } | null;
   stale?: boolean;
   lastSuccessfulAt?: number;
   error?: { message?: string };
