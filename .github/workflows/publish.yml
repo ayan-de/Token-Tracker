@@ -47,5 +47,5 @@ jobs:
           tagName: v__VERSION__ # Will automatically match target version tag, e.g. v0.1.0
           releaseName: 'TokenTracker v__VERSION__'
           releaseBody: 'Installers for TokenTracker Desktop.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
