@@ -1,8 +1,9 @@
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
-use tauri::Manager;
-use tauri::Emitter;
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 use std::env;
+use std::path::{Path, PathBuf};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::Emitter;
+use tauri::Manager;
 
 fn find_cli_path() -> Option<PathBuf> {
     // 1. Check if the environment variable CODEXBAR_BIN is set
@@ -56,6 +57,68 @@ fn find_cli_path() -> Option<PathBuf> {
     None
 }
 
+fn executable_exists(names: &[&str]) -> bool {
+    let Some(paths) = env::var_os("PATH") else {
+        return false;
+    };
+    env::split_paths(&paths).any(|directory| {
+        names.iter().any(|name| {
+            let candidate = directory.join(name);
+            candidate.is_file()
+        })
+    })
+}
+
+fn detect_installed_providers() -> HashSet<String> {
+    // Provider IDs are mapped to the local executable names users install.
+    // Credential-only providers are added later when they return real usage.
+    const PROVIDER_COMMANDS: &[(&str, &[&str])] = &[
+        ("codex", &["codex"]),
+        ("claude", &["claude"]),
+        ("cursor", &["cursor"]),
+        ("opencode", &["opencode"]),
+        ("opencodego", &["opencode-go"]),
+        ("factory", &["droid"]),
+        ("gemini", &["gemini"]),
+        ("antigravity", &["antigravity", "agy"]),
+        ("copilot", &["copilot"]),
+        ("zai", &["zai"]),
+        ("minimax", &["minimax"]),
+        ("kimi", &["kimi"]),
+        ("kilo", &["kilo"]),
+        ("kiro", &["kiro"]),
+        ("augment", &["auggie"]),
+        ("kimik2", &["kimi-k2"]),
+        ("moonshot", &["moonshot"]),
+        ("amp", &["amp"]),
+        ("ollama", &["ollama"]),
+        ("synthetic", &["synthetic"]),
+        ("warp", &["warp-cli"]),
+        ("openrouter", &["openrouter"]),
+        ("windsurf", &["windsurf"]),
+        ("zed", &["zed"]),
+        ("mimo", &["mimo"]),
+        ("mistral", &["mistral"]),
+        ("deepseek", &["deepseek"]),
+        ("codebuff", &["codebuff"]),
+        ("crof", &["crof"]),
+        ("venice", &["venice"]),
+        ("stepfun", &["stepfun"]),
+        ("grok", &["grok"]),
+        ("groq", &["groq"]),
+        ("litellm", &["litellm"]),
+        ("deepgram", &["deepgram"]),
+        ("poe", &["poe"]),
+        ("chutes", &["chutes"]),
+    ];
+
+    PROVIDER_COMMANDS
+        .iter()
+        .filter(|(_, commands)| executable_exists(commands))
+        .map(|(provider, _)| (*provider).to_string())
+        .collect()
+}
+
 #[tauri::command]
 async fn run_codexbar_command(args: Vec<String>) -> Result<String, String> {
     let cli_path = find_cli_path().ok_or_else(|| "cli_not_found".to_string())?;
@@ -98,7 +161,11 @@ async fn get_cli_status() -> Result<serde_json::Value, String> {
 
 fn get_cache_path() -> Option<PathBuf> {
     let home = env::var("HOME").ok()?;
-    Some(Path::new(&home).join(".codexbar-desktop").join("cache.json"))
+    Some(
+        Path::new(&home)
+            .join(".codexbar-desktop")
+            .join("cache.json"),
+    )
 }
 
 fn read_cache() -> Option<serde_json::Value> {
@@ -115,12 +182,115 @@ fn write_cache(val: &serde_json::Value) -> Result<(), String> {
     let path = get_cache_path().ok_or_else(|| "HOME directory not found".to_string())?;
     if let Some(parent) = path.parent() {
         if !parent.exists() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create cache directory: {}", e))?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create cache directory: {}", e))?;
         }
     }
-    let content = serde_json::to_string_pretty(val).map_err(|e| format!("Failed to serialize cache: {}", e))?;
+    let content = serde_json::to_string_pretty(val)
+        .map_err(|e| format!("Failed to serialize cache: {}", e))?;
     std::fs::write(&path, content).map_err(|e| format!("Failed to write cache file: {}", e))?;
     Ok(())
+}
+
+fn usage_item_key(item: &serde_json::Value) -> (String, String) {
+    let provider = item
+        .get("provider")
+        .and_then(|value| value.as_str())
+        .unwrap_or_default();
+    let account = item
+        .get("cacheAccountKey")
+        .or_else(|| item.get("account"))
+        .and_then(|value| value.as_str())
+        .unwrap_or_default();
+    (provider.to_string(), account.to_string())
+}
+
+fn has_usage_data(item: &serde_json::Value) -> bool {
+    item.pointer("/usage/primary")
+        .is_some_and(|value| !value.is_null())
+}
+
+fn filter_usage_to_installed(
+    usage: serde_json::Value,
+    installed_providers: &HashSet<String>,
+) -> serde_json::Value {
+    let Some(items) = usage.as_array() else {
+        return usage;
+    };
+    serde_json::Value::Array(
+        items
+            .iter()
+            .filter(|item| {
+                let (provider, _) = usage_item_key(item);
+                installed_providers.contains(&provider) || has_usage_data(item)
+            })
+            .cloned()
+            .collect(),
+    )
+}
+
+fn merge_usage_with_cache(
+    fresh_usage: serde_json::Value,
+    cached_payload: Option<&serde_json::Value>,
+    timestamp: u64,
+) -> serde_json::Value {
+    let Some(fresh_items) = fresh_usage.as_array() else {
+        return fresh_usage;
+    };
+    let cached_items = cached_payload
+        .and_then(|payload| payload.get("usage"))
+        .and_then(serde_json::Value::as_array);
+    let cached_timestamp = cached_payload
+        .and_then(|payload| payload.get("timestamp"))
+        .and_then(serde_json::Value::as_u64);
+
+    serde_json::Value::Array(
+        fresh_items
+            .iter()
+            .map(|fresh_item| {
+                let mut merged = fresh_item.clone();
+                let has_error = fresh_item
+                    .get("error")
+                    .is_some_and(|value| !value.is_null());
+
+                if has_usage_data(fresh_item) {
+                    if let Some(object) = merged.as_object_mut() {
+                        object.insert("stale".to_string(), serde_json::Value::Bool(false));
+                        object.insert("lastSuccessfulAt".to_string(), serde_json::json!(timestamp));
+                    }
+                    return merged;
+                }
+
+                if has_error {
+                    let key = usage_item_key(fresh_item);
+                    let cached_success = cached_items.and_then(|items| {
+                        items.iter().find(|cached_item| {
+                            usage_item_key(cached_item) == key && has_usage_data(cached_item)
+                        })
+                    });
+
+                    if let Some(cached_item) = cached_success {
+                        merged = cached_item.clone();
+                        if let Some(object) = merged.as_object_mut() {
+                            object.insert("error".to_string(), fresh_item["error"].clone());
+                            object.insert("stale".to_string(), serde_json::Value::Bool(true));
+                            object.insert("staleSince".to_string(), serde_json::json!(timestamp));
+                            if !object.contains_key("lastSuccessfulAt") {
+                                if let Some(previous_timestamp) = cached_timestamp {
+                                    object.insert(
+                                        "lastSuccessfulAt".to_string(),
+                                        serde_json::json!(previous_timestamp),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                merged
+            })
+            .collect(),
+    )
 }
 
 async fn refresh_and_cache() -> Result<serde_json::Value, String> {
@@ -135,7 +305,7 @@ async fn refresh_and_cache() -> Result<serde_json::Value, String> {
 
     let usage_stdout = String::from_utf8_lossy(&usage_output.stdout);
     let usage_json = serde_json::from_str::<serde_json::Value>(&usage_stdout)
-        .unwrap_or_else(|_| serde_json::json!([]));
+        .map_err(|error| format!("Failed to parse usage JSON: {error}"))?;
 
     // 2. Run cost command
     let cost_output = tokio::process::Command::new(&cli_path)
@@ -153,10 +323,25 @@ async fn refresh_and_cache() -> Result<serde_json::Value, String> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
+    let cached_payload = read_cache();
+    let mut installed_providers = detect_installed_providers();
+    if let Some(items) = usage_json.as_array() {
+        installed_providers.extend(
+            items
+                .iter()
+                .filter(|item| has_usage_data(item))
+                .map(|item| usage_item_key(item).0),
+        );
+    }
+    let usage_json = filter_usage_to_installed(usage_json, &installed_providers);
+    let usage_json = merge_usage_with_cache(usage_json, cached_payload.as_ref(), timestamp);
+    let mut installed_providers = installed_providers.into_iter().collect::<Vec<_>>();
+    installed_providers.sort();
 
     let payload = serde_json::json!({
         "usage": usage_json,
         "cost": cost_json,
+        "installedProviders": installed_providers,
         "timestamp": timestamp
     });
 
@@ -164,6 +349,88 @@ async fn refresh_and_cache() -> Result<serde_json::Value, String> {
     write_cache(&payload)?;
 
     Ok(payload)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{filter_usage_to_installed, merge_usage_with_cache};
+    use std::collections::HashSet;
+
+    #[test]
+    fn filters_unconfigured_provider_errors_but_keeps_installed_and_successful_providers() {
+        let usage = serde_json::json!([
+            { "provider": "antigravity", "error": { "message": "not running" } },
+            { "provider": "minimax", "error": { "message": "not configured" } },
+            { "provider": "openai", "usage": { "primary": { "usedPercent": 10 } } }
+        ]);
+        let installed = HashSet::from(["antigravity".to_string()]);
+
+        let filtered = filter_usage_to_installed(usage, &installed);
+
+        assert_eq!(filtered.as_array().map(Vec::len), Some(2));
+        assert_eq!(filtered[0]["provider"], "antigravity");
+        assert_eq!(filtered[1]["provider"], "openai");
+    }
+
+    #[test]
+    fn keeps_last_successful_usage_when_refresh_returns_an_error() {
+        let cached = serde_json::json!({
+            "timestamp": 100,
+            "usage": [{
+                "provider": "antigravity",
+                "usage": { "primary": { "usedPercent": 42 } }
+            }]
+        });
+        let fresh = serde_json::json!([{
+            "provider": "antigravity",
+            "source": "auto",
+            "error": { "message": "language server not detected" }
+        }]);
+
+        let merged = merge_usage_with_cache(fresh, Some(&cached), 200);
+
+        assert_eq!(merged[0]["usage"]["primary"]["usedPercent"], 42);
+        assert_eq!(merged[0]["stale"], true);
+        assert_eq!(merged[0]["lastSuccessfulAt"], 100);
+        assert_eq!(
+            merged[0]["error"]["message"],
+            "language server not detected"
+        );
+    }
+
+    #[test]
+    fn leaves_first_error_visible_without_inventing_usage() {
+        let fresh = serde_json::json!([{
+            "provider": "antigravity",
+            "error": { "message": "language server not detected" }
+        }]);
+
+        let merged = merge_usage_with_cache(fresh.clone(), None, 200);
+
+        assert_eq!(merged, fresh);
+    }
+
+    #[test]
+    fn successful_refresh_replaces_stale_usage() {
+        let cached = serde_json::json!({
+            "timestamp": 100,
+            "usage": [{
+                "provider": "antigravity",
+                "stale": true,
+                "usage": { "primary": { "usedPercent": 42 } }
+            }]
+        });
+        let fresh = serde_json::json!([{
+            "provider": "antigravity",
+            "usage": { "primary": { "usedPercent": 50 } }
+        }]);
+
+        let merged = merge_usage_with_cache(fresh, Some(&cached), 200);
+
+        assert_eq!(merged[0]["usage"]["primary"]["usedPercent"], 50);
+        assert_eq!(merged[0]["stale"], false);
+        assert_eq!(merged[0]["lastSuccessfulAt"], 200);
+    }
 }
 
 #[tauri::command]
@@ -186,7 +453,18 @@ async fn get_usage_data() -> Result<serde_json::Value, String> {
     if let Some(cache) = read_cache() {
         if let Some(usage) = cache.get("usage") {
             if !usage.is_null() {
-                return Ok(usage.clone());
+                let cached_installed = cache
+                    .get("installedProviders")
+                    .and_then(serde_json::Value::as_array)
+                    .map(|providers| {
+                        providers
+                            .iter()
+                            .filter_map(serde_json::Value::as_str)
+                            .map(str::to_string)
+                            .collect::<HashSet<_>>()
+                    });
+                let installed = cached_installed.unwrap_or_else(detect_installed_providers);
+                return Ok(filter_usage_to_installed(usage.clone(), &installed));
             }
         }
     }
@@ -224,13 +502,24 @@ async fn install_cli(app: tauri::AppHandle) -> Result<String, String> {
     let arch = match std::env::consts::ARCH {
         "x86_64" => "x86_64",
         "aarch64" => "aarch64",
-        _ => return Err(format!("Unsupported architecture: {}", std::env::consts::ARCH)),
+        _ => {
+            return Err(format!(
+                "Unsupported architecture: {}",
+                std::env::consts::ARCH
+            ))
+        }
     };
 
-    let _ = app.emit("install-progress", "Fetching latest version tag from GitHub...");
+    let _ = app.emit(
+        "install-progress",
+        "Fetching latest version tag from GitHub...",
+    );
 
     let version_output = tokio::process::Command::new("curl")
-        .args(&["-s", "https://api.github.com/repos/steipete/CodexBar/releases/latest"])
+        .args(&[
+            "-s",
+            "https://api.github.com/repos/steipete/CodexBar/releases/latest",
+        ])
         .output()
         .await;
 
@@ -241,9 +530,9 @@ async fn install_cli(app: tauri::AppHandle) -> Result<String, String> {
             if let Some(pos) = stdout.find("\"tag_name\"") {
                 let sub = &stdout[pos..];
                 if let Some(start) = sub.find(':') {
-                    let val_sub = &sub[start+1..];
+                    let val_sub = &sub[start + 1..];
                     if let Some(quote1) = val_sub.find('"') {
-                        let tag_sub = &val_sub[quote1+1..];
+                        let tag_sub = &val_sub[quote1 + 1..];
                         if let Some(quote2) = tag_sub.find('"') {
                             version = tag_sub[..quote2].to_string();
                         }
@@ -253,7 +542,10 @@ async fn install_cli(app: tauri::AppHandle) -> Result<String, String> {
         }
     }
 
-    let _ = app.emit("install-progress", format!("Selected version: {}. Downloading...", version));
+    let _ = app.emit(
+        "install-progress",
+        format!("Selected version: {}. Downloading...", version),
+    );
 
     let tarball = format!("CodexBarCLI-{}-linux-{}.tar.gz", version, arch);
     let url = format!(
@@ -296,10 +588,18 @@ async fn install_cli(app: tauri::AppHandle) -> Result<String, String> {
         }
     }
 
-    let _ = app.emit("install-progress", "Download complete. Extracting tarball...");
+    let _ = app.emit(
+        "install-progress",
+        "Download complete. Extracting tarball...",
+    );
 
     let tar_status = tokio::process::Command::new("tar")
-        .args(&["-xzf", dest_tarball.to_str().unwrap(), "-C", temp_dir.to_str().unwrap()])
+        .args(&[
+            "-xzf",
+            dest_tarball.to_str().unwrap(),
+            "-C",
+            temp_dir.to_str().unwrap(),
+        ])
         .status()
         .await;
 
@@ -383,7 +683,7 @@ pub fn run() {
             if let Some(icon) = icon {
                 tray_builder = tray_builder.icon(icon);
             }
-            
+
             let _tray = tray_builder
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click { button: _, .. } = event {
@@ -404,9 +704,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            run_codexbar_command, 
-            get_cli_status, 
-            get_usage_data, 
+            run_codexbar_command,
+            get_cli_status,
+            get_usage_data,
             get_cost_data,
             install_cli,
             trigger_refresh
@@ -414,4 +714,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

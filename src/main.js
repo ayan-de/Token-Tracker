@@ -30,14 +30,30 @@ function formatPacingStage(stage) {
     .replace(/^./, (str) => str.toUpperCase());
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function providerLabel(provider, explicitLabel) {
+  return explicitLabel || provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
 // Normalize raw CLI usage data into UI-friendly structure
 function mapCLIUsage(cliItem) {
+  const provider = cliItem.provider || "unknown";
+  const errorMessage = cliItem.error?.message || "Usage is temporarily unavailable.";
+  const hasUsage = Boolean(cliItem.usage?.primary);
+
   // Graceful fallback for Claude on Linux
-  if (cliItem.provider === "claude" && cliItem.error) {
-    const errorMsg = cliItem.error.message || "";
-    const msg = errorMsg.includes("web support")
+  if (provider === "claude" && cliItem.error && !hasUsage) {
+    const msg = errorMessage.includes("web support")
       ? "Requires --source cli on Linux"
-      : "Active (No session data)";
+      : errorMessage;
     return {
       provider: "claude",
       provider_label: "Claude",
@@ -47,12 +63,14 @@ function mapCLIUsage(cliItem) {
       unit: "requests",
       resets_at: null,
       pacing: { stage: "onTrack" },
-      status_message: msg
+      status_message: msg,
+      unavailable: true,
+      error_message: errorMessage
     };
   }
 
   // Graceful fallback for OpenCode Go on Linux
-  if (cliItem.provider === "opencodego" && cliItem.error && cliItem.error.message.includes("not detected")) {
+  if (provider === "opencodego" && cliItem.error && !hasUsage && errorMessage.includes("not detected")) {
     return {
       provider: "opencodego",
       provider_label: "OpenCode Go",
@@ -62,20 +80,31 @@ function mapCLIUsage(cliItem) {
       unit: "requests",
       resets_at: null,
       pacing: { stage: "onTrack" },
-      status_message: "Not active (Run 'opencode login')"
+      status_message: "Not active (Run 'opencode login')",
+      unavailable: true,
+      error_message: errorMessage
     };
   }
 
-  // Skip other providers with errors (no usage data)
-  if (!cliItem.usage || !cliItem.usage.primary) {
-    return null;
+  // Keep unavailable providers visible even when there is no successful snapshot yet.
+  if (!hasUsage) {
+    return {
+      provider,
+      provider_label: providerLabel(provider, cliItem.provider_label),
+      percentage: 0,
+      used: null,
+      limit: null,
+      unit: "requests",
+      resets_at: null,
+      pacing: { stage: "onTrack" },
+      status_message: errorMessage,
+      unavailable: true,
+      error_message: errorMessage
+    };
   }
 
-  const provider = cliItem.provider || "unknown";
-
   // Capitalize provider label
-  let provider_label = cliItem.provider_label ||
-    (provider.charAt(0).toUpperCase() + provider.slice(1));
+  let provider_label = providerLabel(provider, cliItem.provider_label);
 
   let percentage = 0;
   let used = null;
@@ -105,7 +134,10 @@ function mapCLIUsage(cliItem) {
     limit,
     unit,
     resets_at,
-    pacing: { stage: pacingStage }
+    pacing: { stage: pacingStage },
+    stale: cliItem.stale === true,
+    last_successful_at: cliItem.lastSuccessfulAt ?? null,
+    error_message: cliItem.error?.message || null
   };
 }
 
@@ -271,7 +303,7 @@ function renderUsage(providers) {
 
   providers.forEach(p => {
     const card = document.createElement("div");
-    card.className = "provider-card";
+    card.className = `provider-card${p.stale ? " stale" : ""}${p.unavailable ? " unavailable" : ""}`;
 
     const fillPercent = Math.min(Math.max(p.percentage || 0, 0), 100);
     let fillClass = "";
@@ -296,24 +328,38 @@ function renderUsage(providers) {
 
     const pacingStage = p.pacing?.stage || "onTrack";
     const pacingClass = pacingStage.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+    const stateBadge = p.stale
+      ? '<span class="pacing-badge stale">Stale</span>'
+      : p.unavailable
+        ? '<span class="pacing-badge unavailable">Unavailable</span>'
+        : `<span class="pacing-badge ${pacingClass}">${escapeHtml(formatPacingStage(pacingStage))}</span>`;
+    const lastSuccessful = p.last_successful_at
+      ? new Date(p.last_successful_at * 1000).toLocaleString()
+      : null;
+    const statusDetail = p.stale && p.error_message
+      ? `<div class="provider-status stale">Last update failed${lastSuccessful ? `; showing data from ${escapeHtml(lastSuccessful)}` : ""}. ${escapeHtml(p.error_message)}</div>`
+      : p.unavailable && p.error_message
+        ? `<div class="provider-status unavailable">${escapeHtml(p.error_message)}</div>`
+        : "";
 
     card.innerHTML = `
       <div class="provider-meta">
         <div class="provider-name">
-          <div class="provider-avatar ${p.provider}">${p.provider.substring(0,2)}</div>
-          <span>${p.provider_label}</span>
+          <div class="provider-avatar ${escapeHtml(p.provider)}">${escapeHtml(p.provider.substring(0,2))}</div>
+          <span>${escapeHtml(p.provider_label)}</span>
         </div>
-        <span class="pacing-badge ${pacingClass}">${formatPacingStage(pacingStage)}</span>
+        ${stateBadge}
       </div>
       <div class="progress-container">
         <div class="progress-track">
           <div class="progress-fill ${fillClass}" style="width: ${fillPercent}%"></div>
         </div>
         <div class="progress-labels">
-          <span>${labelText}</span>
+          <span>${escapeHtml(labelText)}</span>
           ${resetsHtml}
         </div>
       </div>
+      ${statusDetail}
     `;
     container.appendChild(card);
   });
@@ -467,5 +513,4 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
-
 

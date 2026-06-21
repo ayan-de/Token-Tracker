@@ -196,6 +196,14 @@ header {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.provider-card.stale {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+.provider-card.unavailable {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
 .provider-meta {
   display: flex;
   justify-content: space-between;
@@ -240,6 +248,8 @@ header {
 .pacing-badge.on-track { background: rgba(16, 185, 129, 0.1); color: var(--status-ok); }
 .pacing-badge.slightly-ahead, .pacing-badge.ahead, .pacing-badge.far-ahead { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); }
 .pacing-badge.slightly-behind, .pacing-badge.behind, .pacing-badge.far-behind { background: rgba(239, 68, 68, 0.1); color: var(--status-danger); }
+.pacing-badge.stale { background: rgba(245, 158, 11, 0.12); color: var(--status-warning); }
+.pacing-badge.unavailable { background: rgba(239, 68, 68, 0.1); color: var(--status-danger); }
 
 /* Progress Bar */
 .progress-container {
@@ -289,6 +299,19 @@ header {
 .time-reset svg {
   width: 10px;
   height: 10px;
+}
+
+.provider-status {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.provider-status.stale {
+  color: var(--status-warning);
+}
+
+.provider-status.unavailable {
+  color: var(--status-danger);
 }
 
 /* Cost & Spend Section */
@@ -628,5 +651,4 @@ header {
   line-height: 1.4;
   display: none;
 }
-
 
