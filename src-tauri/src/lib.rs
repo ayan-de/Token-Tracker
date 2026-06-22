@@ -320,7 +320,7 @@ async fn refresh_and_cache() -> Result<serde_json::Value, String> {
 
     // 1. Run usage command
     let usage_output = tokio::process::Command::new(&cli_path)
-        .args(&["usage", "--json"])
+        .args(&["usage", "--provider", "all", "--json"])
         .output()
         .await
         .map_err(|e| format!("Failed to run usage command: {}", e))?;
@@ -331,7 +331,7 @@ async fn refresh_and_cache() -> Result<serde_json::Value, String> {
 
     // 2. Run cost command
     let cost_output = tokio::process::Command::new(&cli_path)
-        .args(&["cost", "--json"])
+        .args(&["cost", "--provider", "all", "--json"])
         .output()
         .await
         .map_err(|e| format!("Failed to run cost command: {}", e))?;
