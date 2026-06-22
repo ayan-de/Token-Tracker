@@ -318,22 +318,35 @@ fn merge_usage_with_cache(
 async fn refresh_and_cache() -> Result<serde_json::Value, String> {
     let cli_path = find_cli_path().ok_or_else(|| "cli_not_found".to_string())?;
 
-    // 1. Run usage command
-    let usage_output = tokio::process::Command::new(&cli_path)
-        .args(&["usage", "--provider", "all", "--json"])
-        .output()
+    // Run usage and cost commands in parallel
+    let cli_path_usage = cli_path.clone();
+    let usage_handle = tokio::spawn(async move {
+        tokio::process::Command::new(&cli_path_usage)
+            .args(&["usage", "--provider", "all", "--json"])
+            .output()
+            .await
+    });
+
+    let cli_path_cost = cli_path.clone();
+    let cost_handle = tokio::spawn(async move {
+        tokio::process::Command::new(&cli_path_cost)
+            .args(&["cost", "--provider", "all", "--json"])
+            .output()
+            .await
+    });
+
+    let usage_output = usage_handle
         .await
+        .map_err(|e| format!("Usage task join failed: {}", e))?
         .map_err(|e| format!("Failed to run usage command: {}", e))?;
 
     let usage_stdout = String::from_utf8_lossy(&usage_output.stdout);
     let usage_json = serde_json::from_str::<serde_json::Value>(&usage_stdout)
         .map_err(|error| format!("Failed to parse usage JSON: {error}"))?;
 
-    // 2. Run cost command
-    let cost_output = tokio::process::Command::new(&cli_path)
-        .args(&["cost", "--provider", "all", "--json"])
-        .output()
+    let cost_output = cost_handle
         .await
+        .map_err(|e| format!("Cost task join failed: {}", e))?
         .map_err(|e| format!("Failed to run cost command: {}", e))?;
 
     let cost_stdout = String::from_utf8_lossy(&cost_output.stdout);
