@@ -9,7 +9,7 @@ export default function ErrorBanner({ message }: ErrorBannerProps) {
   return (
     <div
       id="error-banner"
-      className="mx-3 mb-2 px-3 py-2 rounded-lg bg-status-danger/10 border border-status-danger/30 text-status-danger text-xs hidden"
+      className="mx-3 mb-2 px-3 py-2 rounded-lg bg-status-danger/10 border border-status-danger/30 text-status-danger text-xs"
       role="alert"
     >
       {message}
