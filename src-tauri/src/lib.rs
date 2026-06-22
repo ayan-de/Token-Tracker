@@ -142,10 +142,20 @@ fn detect_installed_providers() -> HashSet<String> {
         .collect()
 }
 
+fn create_cli_command(path: &Path) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(path);
+    #[cfg(target_os = "linux")]
+    {
+        cmd.env_remove("LD_LIBRARY_PATH");
+        cmd.env_remove("LD_PRELOAD");
+    }
+    cmd
+}
+
 #[tauri::command]
 async fn run_codexbar_command(args: Vec<String>) -> Result<String, String> {
     let cli_path = find_cli_path().ok_or_else(|| "cli_not_found".to_string())?;
-    tokio::process::Command::new(cli_path)
+    create_cli_command(&cli_path)
         .args(&args)
         .output()
         .await
@@ -168,7 +178,7 @@ async fn get_cli_status() -> Result<serde_json::Value, String> {
         None => return Ok(serde_json::json!({"status": "not_installed"})),
     };
 
-    tokio::process::Command::new(cli_path)
+    create_cli_command(&cli_path)
         .arg("--version")
         .output()
         .await
@@ -321,7 +331,7 @@ async fn refresh_and_cache() -> Result<serde_json::Value, String> {
     // Run usage and cost commands in parallel
     let cli_path_usage = cli_path.clone();
     let usage_handle = tokio::spawn(async move {
-        tokio::process::Command::new(&cli_path_usage)
+        create_cli_command(&cli_path_usage)
             .args(&["usage", "--provider", "all", "--json"])
             .output()
             .await
@@ -329,7 +339,7 @@ async fn refresh_and_cache() -> Result<serde_json::Value, String> {
 
     let cli_path_cost = cli_path.clone();
     let cost_handle = tokio::spawn(async move {
-        tokio::process::Command::new(&cli_path_cost)
+        create_cli_command(&cli_path_cost)
             .args(&["cost", "--provider", "all", "--json"])
             .output()
             .await
