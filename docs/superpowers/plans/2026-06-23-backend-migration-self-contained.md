@@ -243,12 +243,12 @@ Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
 
 ### Phase 5: Desktop UI Migration
 
-- [ ] **Task 19:** Create `src/lib/apiClient.ts` — HTTP fetch wrapper matching API endpoints
-- [ ] **Task 20:** Update `src/hooks/useCodexBar.ts` — replace `invoke()` calls with `apiClient.ts`
-- [ ] **Task 21:** Replace `src/lib/tauriEvents.ts` — SSE or polling for live updates
-- [ ] **Task 22:** Delete `src/lib/tauri.ts` — all invoke wrappers removed
-- [ ] **Task 23:** Remove `InstallOverlay` from `src/app/page.tsx` — no CLI dependency
-- [ ] **Task 24:** Verify desktop UI — full refresh cycle, theme toggle, provider tabs all work
+- [x] **Task 19:** Create `src/lib/apiClient.ts` — HTTP fetch wrapper matching API endpoints
+- [x] **Task 20:** Update `src/hooks/useCodexBar.ts` — replace `invoke()` calls with `apiClient.ts`
+- [x] **Task 21:** Replace `src/lib/tauriEvents.ts` — SSE or polling for live updates
+- [x] **Task 22:** Delete `src/lib/tauri.ts` — all invoke wrappers removed
+- [x] **Task 23:** Remove `InstallOverlay` from `src/app/page.tsx` — no CLI dependency
+- [x] **Task 24:** Verify desktop UI — full refresh cycle, theme toggle, provider tabs all work
 
 ### Phase 6: Settings & Credentials API
 
