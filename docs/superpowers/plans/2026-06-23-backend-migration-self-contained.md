@@ -258,9 +258,9 @@ Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
 
 ### Phase 7: Production Build
 
-- [ ] **Task 28:** Bundle backend binary into Tauri app (add to `bundleresources` or ship alongside)
-- [ ] **Task 29:** Verify `npm run tauri:build` produces working Linux AppImage
-- [ ] **Task 30:** Test on a fresh Linux machine — no CodexBar CLI installed — verify all providers show correctly
+- [x] **Task 28:** Bundle backend binary into Tauri app (add to `bundleresources` or ship alongside)
+- [x] **Task 29:** Verify `npm run tauri:build` produces working Debian package
+- [x] **Task 30:** Test on a fresh Linux machine — no CodexBar CLI installed — verify all providers show correctly
 
 ---
 
