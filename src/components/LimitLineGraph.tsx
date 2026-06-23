@@ -104,6 +104,10 @@ export default function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
   const options: any = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: {
+      duration: 600,
+      easing: "easeOutQuart",
+    },
     plugins: {
       legend: {
         display: true,
@@ -152,7 +156,7 @@ export default function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
     <div className="py-2.5 border-b border-border-subtle">
       <div className="text-xs font-semibold text-text-main mb-2">Usage Overview</div>
       <div className="h-[120px]">
-        <Line data={data} options={options} />
+        <Line key={p.provider} data={data} options={options} />
       </div>
     </div>
   );
