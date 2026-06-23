@@ -1,0 +1,782 @@
+//! JSONL Scanner with Caching
+//!
+//! Incremental log file parsing for Codex and Claude session logs.
+//! Supports file-level caching to avoid re-parsing unchanged files.
+
+#![allow(dead_code)]
+
+use crate::core::{CostUsagePricing, ProviderId};
+use chrono::{NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+
+/// Cache for scanned file data
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CostUsageCache {
+    /// Last scan timestamp in milliseconds
+    pub last_scan_unix_ms: i64,
+    /// Per-file usage data
+    pub files: HashMap<String, CostUsageFileUsage>,
+    /// Aggregated daily data: day_key -> model -> [input, cached, output]
+    pub days: HashMap<String, HashMap<String, Vec<i32>>>,
+}
+
+/// Per-file usage tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostUsageFileUsage {
+    /// File modification time in milliseconds
+    pub mtime_unix_ms: i64,
+    /// File size in bytes
+    pub size: i64,
+    /// Daily usage data extracted from this file
+    pub days: HashMap<String, HashMap<String, Vec<i32>>>,
+    /// Bytes parsed so far (for incremental parsing)
+    pub parsed_bytes: Option<i64>,
+    /// Last model seen (for delta calculations)
+    pub last_model: Option<String>,
+    /// Last token totals (for delta calculations)
+    pub last_totals: Option<CodexTotals>,
+}
+
+/// Running totals for Codex token counting
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodexTotals {
+    pub input: i32,
+    pub cached: i32,
+    pub output: i32,
+}
+
+/// Result of parsing a Codex file
+#[derive(Debug)]
+pub struct CodexParseResult {
+    /// Daily usage: day_key -> model -> [input, cached, output]
+    pub days: HashMap<String, HashMap<String, Vec<i32>>>,
+    /// Bytes parsed
+    pub parsed_bytes: i64,
+    /// Last model seen
+    pub last_model: Option<String>,
+    /// Last totals seen
+    pub last_totals: Option<CodexTotals>,
+}
+
+/// Day range for scanning
+pub struct CostUsageDayRange {
+    pub since_key: String,
+    pub until_key: String,
+    pub scan_since_key: String,
+    pub scan_until_key: String,
+}
+
+impl CostUsageDayRange {
+    pub fn new(since: NaiveDate, until: NaiveDate) -> Self {
+        let since_minus_one = since - chrono::Duration::days(1);
+        let until_plus_one = until + chrono::Duration::days(1);
+
+        Self {
+            since_key: Self::day_key(since),
+            until_key: Self::day_key(until),
+            scan_since_key: Self::day_key(since_minus_one),
+            scan_until_key: Self::day_key(until_plus_one),
+        }
+    }
+
+    pub fn day_key(date: NaiveDate) -> String {
+        date.format("%Y-%m-%d").to_string()
+    }
+
+    pub fn is_in_range(day_key: &str, since: &str, until: &str) -> bool {
+        day_key >= since && day_key <= until
+    }
+
+    pub fn parse_day_key(key: &str) -> Option<NaiveDate> {
+        NaiveDate::parse_from_str(key, "%Y-%m-%d").ok()
+    }
+}
+
+/// JSONL Scanner for cost/usage logs
+pub struct JsonlScanner;
+
+struct CodexParserState {
+    current_model: Option<String>,
+    previous_totals: Option<CodexTotals>,
+    days: HashMap<String, HashMap<String, Vec<i32>>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexFastLine<'a> {
+    #[serde(rename = "type", borrow)]
+    event_type: Option<&'a str>,
+    #[serde(default, borrow)]
+    timestamp: Option<&'a str>,
+    #[serde(default, borrow)]
+    payload: Option<CodexFastPayload<'a>>,
+    #[serde(default, borrow)]
+    event_msg: Option<CodexFastPayload<'a>>,
+    #[serde(default, borrow)]
+    model: Option<&'a str>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexFastPayload<'a> {
+    #[serde(rename = "type", borrow)]
+    payload_type: Option<&'a str>,
+    #[serde(default, borrow)]
+    model: Option<&'a str>,
+    #[serde(default, borrow)]
+    model_name: Option<&'a str>,
+    #[serde(default, borrow)]
+    info: Option<CodexFastInfo<'a>>,
+    #[serde(default)]
+    input_tokens: Option<i32>,
+    #[serde(default)]
+    cached_input_tokens: Option<i32>,
+    #[serde(default)]
+    cache_read_input_tokens: Option<i32>,
+    #[serde(default)]
+    output_tokens: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexFastInfo<'a> {
+    #[serde(default, borrow)]
+    model: Option<&'a str>,
+    #[serde(default, borrow)]
+    model_name: Option<&'a str>,
+    #[serde(default)]
+    total_token_usage: Option<CodexFastTotals>,
+    #[serde(default)]
+    last_token_usage: Option<CodexFastTotals>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct CodexFastTotals {
+    #[serde(default)]
+    input_tokens: i32,
+    #[serde(default)]
+    cached_input_tokens: Option<i32>,
+    #[serde(default)]
+    cache_read_input_tokens: Option<i32>,
+    #[serde(default)]
+    output_tokens: i32,
+}
+
+enum CodexFastEvent<'a> {
+    TurnContext {
+        model: Option<&'a str>,
+    },
+    TokenCount {
+        timestamp: &'a str,
+        payload: CodexFastPayload<'a>,
+    },
+}
+
+impl CodexParserState {
+    fn new(initial_model: Option<String>, initial_totals: Option<CodexTotals>) -> Self {
+        Self {
+            current_model: initial_model,
+            previous_totals: initial_totals,
+            days: HashMap::new(),
+        }
+    }
+
+    fn process_line(&mut self, line: &str, range: &CostUsageDayRange) {
+        if !is_candidate_codex_line(line) {
+            return;
+        }
+
+        if let Some(event) = parse_codex_fast_event(line) {
+            self.process_fast_event(event, range);
+            return;
+        }
+
+        let Ok(obj) = serde_json::from_str::<Value>(line) else {
+            return;
+        };
+        let Some(day_key) = codex_line_day_key(&obj, range) else {
+            return;
+        };
+
+        if obj.get("type").and_then(|v| v.as_str()) == Some("turn_context") {
+            self.update_current_model(&obj);
+        }
+
+        if token_count_payload(&obj).is_some() {
+            self.record_token_count(&obj, day_key);
+        }
+    }
+
+    fn process_fast_event(&mut self, event: CodexFastEvent<'_>, range: &CostUsageDayRange) {
+        match event {
+            CodexFastEvent::TurnContext { model } => {
+                if let Some(model) = model.filter(|model| !model.is_empty()) {
+                    self.current_model = Some(model.to_string());
+                }
+            }
+            CodexFastEvent::TokenCount { timestamp, payload } => {
+                let Some(day_key) = timestamp.get(..10) else {
+                    return;
+                };
+                if !CostUsageDayRange::is_in_range(
+                    day_key,
+                    &range.scan_since_key,
+                    &range.scan_until_key,
+                ) {
+                    return;
+                }
+                self.record_fast_token_count(payload, day_key.to_string());
+            }
+        }
+    }
+
+    fn update_current_model(&mut self, obj: &Value) {
+        if let Some(model) = obj
+            .get("model")
+            .or_else(|| obj.get("payload").and_then(|payload| payload.get("model")))
+            .or_else(|| {
+                obj.get("payload")
+                    .and_then(|payload| payload.get("info"))
+                    .and_then(|info| info.get("model"))
+            })
+            .and_then(|v| v.as_str())
+        {
+            self.current_model = Some(model.to_string());
+        }
+    }
+
+    fn record_token_count(&mut self, obj: &Value, day_key: String) {
+        let Some(payload) = token_count_payload(obj) else {
+            return;
+        };
+        let Some((delta_input, delta_cached, delta_output)) = self.token_deltas(payload) else {
+            return;
+        };
+        if delta_input == 0 && delta_cached == 0 && delta_output == 0 {
+            return;
+        }
+
+        let info = payload.get("info");
+        let model = self.token_model(info, payload, obj);
+        let norm_model = CostUsagePricing::normalize_codex_model(&model);
+        let packed = self
+            .days
+            .entry(day_key)
+            .or_default()
+            .entry(norm_model)
+            .or_insert_with(|| vec![0, 0, 0]);
+
+        packed[0] += delta_input;
+        packed[1] += delta_cached.min(delta_input);
+        packed[2] += delta_output;
+    }
+
+    fn record_fast_token_count(&mut self, payload: CodexFastPayload<'_>, day_key: String) {
+        let Some((delta_input, delta_cached, delta_output)) = self.fast_token_deltas(&payload)
+        else {
+            return;
+        };
+        if delta_input == 0 && delta_cached == 0 && delta_output == 0 {
+            return;
+        }
+
+        let model = payload
+            .info
+            .as_ref()
+            .and_then(|info| info.model.or(info.model_name))
+            .or(payload.model)
+            .or(self.current_model.as_deref())
+            .unwrap_or("gpt-5");
+        let norm_model = CostUsagePricing::normalize_codex_model(model);
+        let packed = self
+            .days
+            .entry(day_key)
+            .or_default()
+            .entry(norm_model)
+            .or_insert_with(|| vec![0, 0, 0]);
+
+        packed[0] += delta_input;
+        packed[1] += delta_cached.min(delta_input);
+        packed[2] += delta_output;
+    }
+
+    fn token_model(&self, info: Option<&Value>, payload: &Value, obj: &Value) -> String {
+        info.and_then(|i| i.get("model").or(i.get("model_name")))
+            .or_else(|| payload.get("model"))
+            .or_else(|| obj.get("model"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .or_else(|| self.current_model.clone())
+            .unwrap_or_else(|| "gpt-5".to_string())
+    }
+
+    fn token_deltas(&mut self, payload: &Value) -> Option<(i32, i32, i32)> {
+        let info = payload.get("info");
+        if let Some(total) = info.and_then(|i| i.get("total_token_usage")) {
+            return Some(self.total_usage_delta(total));
+        }
+
+        if let Some(last) = info.and_then(|i| i.get("last_token_usage")) {
+            return Some(last_usage_delta(last));
+        }
+
+        let direct = read_token_totals(payload);
+        (direct.input != 0 || direct.cached != 0 || direct.output != 0).then_some((
+            direct.input.max(0),
+            direct.cached.max(0),
+            direct.output.max(0),
+        ))
+    }
+
+    fn fast_token_deltas(&mut self, payload: &CodexFastPayload<'_>) -> Option<(i32, i32, i32)> {
+        if let Some(total) = payload
+            .info
+            .as_ref()
+            .and_then(|info| info.total_token_usage)
+        {
+            return Some(self.fast_total_usage_delta(total));
+        }
+
+        if let Some(last) = payload.info.as_ref().and_then(|info| info.last_token_usage) {
+            return Some(fast_last_usage_delta(last));
+        }
+
+        let direct = fast_totals_from_payload(payload);
+        (direct.input != 0 || direct.cached != 0 || direct.output != 0).then_some((
+            direct.input.max(0),
+            direct.cached.max(0),
+            direct.output.max(0),
+        ))
+    }
+
+    fn total_usage_delta(&mut self, total: &Value) -> (i32, i32, i32) {
+        let totals = read_token_totals(total);
+        let previous = self.previous_totals.as_ref();
+        let delta_input = (totals.input - previous.map_or(0, |t| t.input)).max(0);
+        let delta_cached = (totals.cached - previous.map_or(0, |t| t.cached)).max(0);
+        let delta_output = (totals.output - previous.map_or(0, |t| t.output)).max(0);
+
+        self.previous_totals = Some(totals);
+        (delta_input, delta_cached, delta_output)
+    }
+
+    fn fast_total_usage_delta(&mut self, total: CodexFastTotals) -> (i32, i32, i32) {
+        let totals = codex_totals_from_fast(total);
+        let previous = self.previous_totals.as_ref();
+        let delta_input = (totals.input - previous.map_or(0, |t| t.input)).max(0);
+        let delta_cached = (totals.cached - previous.map_or(0, |t| t.cached)).max(0);
+        let delta_output = (totals.output - previous.map_or(0, |t| t.output)).max(0);
+
+        self.previous_totals = Some(totals);
+        (delta_input, delta_cached, delta_output)
+    }
+}
+
+fn parse_codex_fast_event(line: &str) -> Option<CodexFastEvent<'_>> {
+    let parsed: CodexFastLine<'_> = serde_json::from_str(line).ok()?;
+    match parsed.event_type? {
+        "turn_context" => {
+            let model = parsed
+                .payload
+                .as_ref()
+                .and_then(|payload| {
+                    payload.model.or(payload.model_name).or_else(|| {
+                        payload
+                            .info
+                            .as_ref()
+                            .and_then(|info| info.model.or(info.model_name))
+                    })
+                })
+                .or(parsed.model);
+            Some(CodexFastEvent::TurnContext { model })
+        }
+        "event_msg" => {
+            let payload = parsed.payload.or(parsed.event_msg)?;
+            (payload.payload_type == Some("token_count")).then_some(CodexFastEvent::TokenCount {
+                timestamp: parsed.timestamp?,
+                payload,
+            })
+        }
+        _ => None,
+    }
+}
+
+fn is_candidate_codex_line(line: &str) -> bool {
+    if !line.contains("\"type\":\"event_msg\"")
+        && !line.contains("\"type\":\"turn_context\"")
+        && !line.contains("\"event_msg\"")
+    {
+        return false;
+    }
+
+    !line.contains("\"type\":\"event_msg\"") || line.contains("\"token_count\"")
+}
+
+fn codex_line_day_key(obj: &Value, range: &CostUsageDayRange) -> Option<String> {
+    let ts = obj.get("timestamp").and_then(|v| v.as_str())?;
+    let day_key = ts.get(..10)?;
+
+    CostUsageDayRange::is_in_range(day_key, &range.scan_since_key, &range.scan_until_key)
+        .then(|| day_key.to_string())
+}
+
+fn token_count_payload(obj: &Value) -> Option<&Value> {
+    if let Some(payload) = obj.get("payload")
+        && payload.get("type").and_then(|v| v.as_str()) == Some("token_count")
+    {
+        return Some(payload);
+    }
+
+    let event_msg = obj.get("event_msg")?;
+    (event_msg.get("type").and_then(|v| v.as_str()) == Some("token_count")).then_some(event_msg)
+}
+
+fn read_token_totals(value: &Value) -> CodexTotals {
+    CodexTotals {
+        input: token_i32(value, "input_tokens"),
+        cached: value
+            .get("cached_input_tokens")
+            .or_else(|| value.get("cache_read_input_tokens"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0) as i32,
+        output: token_i32(value, "output_tokens"),
+    }
+}
+
+fn codex_totals_from_fast(value: CodexFastTotals) -> CodexTotals {
+    CodexTotals {
+        input: value.input_tokens,
+        cached: value
+            .cached_input_tokens
+            .or(value.cache_read_input_tokens)
+            .unwrap_or(0),
+        output: value.output_tokens,
+    }
+}
+
+fn fast_totals_from_payload(value: &CodexFastPayload<'_>) -> CodexTotals {
+    CodexTotals {
+        input: value.input_tokens.unwrap_or(0),
+        cached: value
+            .cached_input_tokens
+            .or(value.cache_read_input_tokens)
+            .unwrap_or(0),
+        output: value.output_tokens.unwrap_or(0),
+    }
+}
+
+fn token_i32(value: &Value, key: &str) -> i32 {
+    value.get(key).and_then(|v| v.as_i64()).unwrap_or(0) as i32
+}
+
+fn last_usage_delta(last: &Value) -> (i32, i32, i32) {
+    let totals = read_token_totals(last);
+    (
+        totals.input.max(0),
+        totals.cached.max(0),
+        totals.output.max(0),
+    )
+}
+
+fn fast_last_usage_delta(last: CodexFastTotals) -> (i32, i32, i32) {
+    let totals = codex_totals_from_fast(last);
+    (
+        totals.input.max(0),
+        totals.cached.max(0),
+        totals.output.max(0),
+    )
+}
+
+impl JsonlScanner {
+    /// Get default Codex sessions root directory
+    pub fn default_codex_sessions_root() -> Option<PathBuf> {
+        // Check CODEX_HOME environment variable
+        if let Ok(home) = std::env::var("CODEX_HOME") {
+            let home = home.trim();
+            if !home.is_empty() {
+                return Some(PathBuf::from(home).join("sessions"));
+            }
+        }
+
+        // Default to ~/.codex/sessions
+        dirs::home_dir().map(|h| h.join(".codex").join("sessions"))
+    }
+
+    /// Get default Claude projects roots
+    pub fn default_claude_projects_roots() -> Vec<PathBuf> {
+        let mut roots = Vec::new();
+
+        // Check CLAUDE_CONFIG_DIR
+        if let Ok(config_dir) = std::env::var("CLAUDE_CONFIG_DIR") {
+            let path = PathBuf::from(config_dir.trim()).join("projects");
+            if path.exists() {
+                roots.push(path);
+            }
+        }
+
+        // Default locations
+        if let Some(home) = dirs::home_dir() {
+            let default_path = home.join(".claude").join("projects");
+            if default_path.exists() && !roots.contains(&default_path) {
+                roots.push(default_path);
+            }
+        }
+
+        roots
+    }
+
+    /// List Codex session files in the given date range
+    pub fn list_codex_session_files(
+        root: &Path,
+        scan_since_key: &str,
+        scan_until_key: &str,
+    ) -> Vec<PathBuf> {
+        let mut files = Vec::new();
+
+        let Some(mut date) = CostUsageDayRange::parse_day_key(scan_since_key) else {
+            return files;
+        };
+        let Some(until_date) = CostUsageDayRange::parse_day_key(scan_until_key) else {
+            return files;
+        };
+
+        while date <= until_date {
+            let year = format!("{:04}", date.year());
+            let month = format!("{:02}", date.month());
+            let day = format!("{:02}", date.day());
+
+            let day_dir = root.join(&year).join(&month).join(&day);
+
+            if let Ok(entries) = fs::read_dir(&day_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path
+                        .extension()
+                        .is_some_and(|e| e.eq_ignore_ascii_case("jsonl"))
+                    {
+                        files.push(path);
+                    }
+                }
+            }
+
+            date += chrono::Duration::days(1);
+        }
+
+        files
+    }
+
+    /// Parse a Codex JSONL file
+    pub fn parse_codex_file(
+        file_path: &Path,
+        range: &CostUsageDayRange,
+        start_offset: i64,
+        initial_model: Option<String>,
+        initial_totals: Option<CodexTotals>,
+    ) -> std::io::Result<CodexParseResult> {
+        let file = File::open(file_path)?;
+        let file_size = file.metadata()?.len() as i64;
+
+        let mut reader = BufReader::new(file);
+        if start_offset > 0 {
+            reader.seek(SeekFrom::Start(start_offset as u64))?;
+        }
+
+        let mut parser = CodexParserState::new(initial_model, initial_totals);
+        let mut parsed_bytes = start_offset;
+
+        let mut line = String::new();
+        while reader.read_line(&mut line)? > 0 {
+            parsed_bytes += line.len() as i64;
+            parser.process_line(&line, range);
+
+            line.clear();
+        }
+
+        Ok(CodexParseResult {
+            days: parser.days,
+            parsed_bytes: file_size.max(parsed_bytes),
+            last_model: parser.current_model,
+            last_totals: parser.previous_totals,
+        })
+    }
+
+    /// Load cache from disk
+    pub fn load_cache(provider: ProviderId, cache_root: Option<&Path>) -> CostUsageCache {
+        let cache_path = Self::cache_path(provider, cache_root);
+
+        if let Ok(contents) = fs::read_to_string(&cache_path)
+            && let Ok(cache) = serde_json::from_str(&contents)
+        {
+            return cache;
+        }
+
+        CostUsageCache::default()
+    }
+
+    /// Save cache to disk
+    pub fn save_cache(provider: ProviderId, cache: &CostUsageCache, cache_root: Option<&Path>) {
+        let cache_path = Self::cache_path(provider, cache_root);
+
+        if let Some(parent) = cache_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+
+        if let Ok(json) = serde_json::to_string_pretty(cache) {
+            let _ = fs::write(&cache_path, json);
+        }
+    }
+
+    fn cache_path(provider: ProviderId, cache_root: Option<&Path>) -> PathBuf {
+        let root = cache_root
+            .map(|p| p.to_path_buf())
+            .or_else(|| dirs::cache_dir().map(|d| d.join("CodexBar")))
+            .unwrap_or_else(|| PathBuf::from("."));
+
+        root.join(format!("{}_cost_cache.json", provider.cli_name()))
+    }
+}
+
+use chrono::Datelike;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_day_range() {
+        let since = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+        let until = NaiveDate::from_ymd_opt(2026, 1, 20).unwrap();
+        let range = CostUsageDayRange::new(since, until);
+
+        assert_eq!(range.since_key, "2026-01-15");
+        assert_eq!(range.until_key, "2026-01-20");
+        assert_eq!(range.scan_since_key, "2026-01-14");
+        assert_eq!(range.scan_until_key, "2026-01-21");
+    }
+
+    #[test]
+    fn test_is_in_range() {
+        assert!(CostUsageDayRange::is_in_range(
+            "2026-01-15",
+            "2026-01-10",
+            "2026-01-20"
+        ));
+        assert!(!CostUsageDayRange::is_in_range(
+            "2026-01-05",
+            "2026-01-10",
+            "2026-01-20"
+        ));
+        assert!(!CostUsageDayRange::is_in_range(
+            "2026-01-25",
+            "2026-01-10",
+            "2026-01-20"
+        ));
+    }
+
+    #[test]
+    fn test_parse_day_key() {
+        let date = CostUsageDayRange::parse_day_key("2026-01-15");
+        assert!(date.is_some());
+        let date = date.unwrap();
+        assert_eq!(date.year(), 2026);
+        assert_eq!(date.month(), 1);
+        assert_eq!(date.day(), 15);
+    }
+
+    #[test]
+    fn test_fast_codex_parser_reads_last_usage_from_payload() {
+        let range = CostUsageDayRange::new(
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+        );
+        let mut parser = CodexParserState::new(None, None);
+
+        parser.process_line(
+            r#"{"timestamp":"2026-05-31T10:00:00.000Z","type":"turn_context","payload":{"info":{"model":"gpt-5.5"}}}"#,
+            &range,
+        );
+        parser.process_line(
+            r#"{"timestamp":"2026-05-31T10:00:02.000Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":120,"cache_read_input_tokens":40,"output_tokens":9}}}}"#,
+            &range,
+        );
+
+        let day = parser.days.get("2026-05-31").expect("day usage");
+        let usage = day.get("gpt-5.5").expect("model usage");
+        assert_eq!(usage, &vec![120, 40, 9]);
+        assert_eq!(parser.current_model.as_deref(), Some("gpt-5.5"));
+    }
+
+    #[test]
+    fn test_fast_codex_parser_diffs_total_usage() {
+        let range = CostUsageDayRange::new(
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+        );
+        let mut parser = CodexParserState::new(Some("gpt-5".to_string()), None);
+
+        parser.process_line(
+            r#"{"timestamp":"2026-05-31T10:00:01.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000,"cached_input_tokens":200,"output_tokens":50}}}}"#,
+            &range,
+        );
+        parser.process_line(
+            r#"{"timestamp":"2026-05-31T10:00:02.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1250,"cached_input_tokens":260,"output_tokens":90}}}}"#,
+            &range,
+        );
+
+        let day = parser.days.get("2026-05-31").expect("day usage");
+        let usage = day.get("gpt-5").expect("model usage");
+        assert_eq!(usage, &vec![1250, 260, 90]);
+        let totals = parser.previous_totals.expect("last totals");
+        assert_eq!(totals.input, 1250);
+        assert_eq!(totals.cached, 260);
+        assert_eq!(totals.output, 90);
+    }
+
+    #[test]
+    fn test_fast_codex_parser_reads_legacy_event_msg_shape() {
+        let range = CostUsageDayRange::new(
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+        );
+        let mut parser = CodexParserState::new(Some("gpt-5".to_string()), None);
+
+        parser.process_line(
+            r#"{"timestamp":"2026-05-31T10:00:02.000Z","type":"event_msg","event_msg":{"type":"token_count","input_tokens":20,"cached_input_tokens":5,"output_tokens":3}}"#,
+            &range,
+        );
+
+        let day = parser.days.get("2026-05-31").expect("day usage");
+        let usage = day.get("gpt-5").expect("model usage");
+        assert_eq!(usage, &vec![20, 5, 3]);
+    }
+
+    #[test]
+    fn test_parse_codex_file_uses_fast_parser_for_current_logs() {
+        let mut file = tempfile::NamedTempFile::new().expect("temp file");
+        writeln!(
+            file,
+            r#"{{"timestamp":"2026-05-31T10:00:00.000Z","type":"turn_context","payload":{{"model":"gpt-5.5"}}}}"#
+        )
+        .unwrap();
+        writeln!(
+            file,
+            r#"{{"timestamp":"2026-05-31T10:00:01.000Z","type":"event_msg","payload":{{"type":"token_count","info":{{"last_token_usage":{{"input_tokens":45,"cached_input_tokens":12,"output_tokens":8}}}}}}}}"#
+        )
+        .unwrap();
+
+        let range = CostUsageDayRange::new(
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 5, 31).unwrap(),
+        );
+        let parsed =
+            JsonlScanner::parse_codex_file(file.path(), &range, 0, None, None).expect("parse");
+
+        assert_eq!(parsed.last_model.as_deref(), Some("gpt-5.5"));
+        let day = parsed.days.get("2026-05-31").expect("day usage");
+        let usage = day.get("gpt-5.5").expect("model usage");
+        assert_eq!(usage, &vec![45, 12, 8]);
+    }
+}
