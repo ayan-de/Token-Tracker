@@ -2,11 +2,74 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the CodexBar CLI dependency with a self-contained Rust backend (copied from Win-CodexBar), keeping the existing React/Next.js frontend unchanged.
+**Goal:** Replace the CodexBar CLI dependency with a self-contained Rust backend that runs as a local HTTP API service, shared by both the existing desktop UI (Tauri/Next.js) and a future mobile UI. Backend and UI are strictly separated.
 
-**Architecture:** Win-CodexBar's `rust/` library is the reference. It implements all provider fetching logic in-process via HTTP clients, PTY for CLI probes, and OAuth flows — no external CLI needed. Token-Tracker replaces its CLI-spawning `lib.rs` with the Win-CodexBar Rust crate, then wires the existing Tauri commands to call into it.
+**Architecture:** Win-CodexBar's `rust/` library is the reference for provider logic. Instead of Tauri command handlers calling into Rust directly, the Rust backend runs as a local HTTP server (localhost) — the same way Win-CodexBar's `serve` subcommand works. Both desktop and mobile UIs make HTTP requests to `localhost:PORT` to fetch provider data, manage credentials, and trigger refreshes. This means one backend binary serves all UIs.
 
-**Tech Stack:** Rust (tokio, reqwest, async-trait, rusqlite, keyring, clap, serde, tracing, chrono)
+**Tech Stack:** Rust (tokio, reqwest, async-trait, rusqlite, keyring, axum/warp for HTTP server), TypeScript/React for desktop and mobile UIs
+
+---
+
+## Target Architecture
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │           Local Machine                  │
+                    │                                         │
+   ┌──────────────┐ │  ┌──────────────────────────────────┐  │
+   │ Mobile UI     │◀│──│ Rust Backend (HTTP API Server)   │  │
+   │ (React Native│ │  │ - Provider fetching (Win-CodexBar │  │
+   │  or Flutter) │ │  │   rust/src/providers/)            │  │
+   └──────────────┘ │  │ - Credential storage (keyring)    │  │
+                    │  │ - Browser cookie import           │  │
+   ┌──────────────┐ │  │ - Cost scanning                   │  │
+   │ Desktop UI   │◀│──│ - Settings persistence            │  │
+   │ (Tauri/      │ │  │ - Notifications (Linux)          │  │
+   │  Next.js)    │ │  └──────────────────────────────────┘  │
+   └──────────────┘ │                                         │
+                    └─────────────────────────────────────────┘
+
+Backend runs once per user session on localhost (port TBD).
+Desktop and Mobile UIs are purely HTTP clients — no direct Rust calls.
+```
+
+### Why HTTP Server Instead of Tauri invoke
+
+- **Shared backend** — Mobile UI (React Native / Flutter) can call the same HTTP API
+- **Process isolation** — Backend crash doesn't kill the UI
+- **Win-CodexBar precedent** — Their `codexbar serve` command is the same pattern
+- **Stateless UI** — Frontends just fetch data; no shared memory with backend
+
+### API Endpoint Design
+
+```
+GET  /api/v1/providers          → List all provider snapshots
+GET  /api/v1/providers/{id}     → Single provider detail
+POST /api/v1/providers/refresh  → Trigger refresh for all/single provider
+GET  /api/v1/cost               → Cost snapshot (last 30 days)
+GET  /api/v1/credentials        → List stored credentials (keys only, not secrets)
+POST /api/v1/credentials        → Store API key or cookie
+DEL  /api/v1/credentials/{id}   → Delete credential
+GET  /api/v1/settings           → Full settings snapshot
+PUT  /api/v1/settings           → Update settings
+GET  /api/v1/browsers           → List detected browsers
+POST /api/v1/browsers/import    → Import cookies from browser
+WS   /ws/v1/events              → Server-sent events for live updates (optional v2)
+```
+
+### Frontend Changes
+
+**Desktop UI (`src/`):**
+- Replace `src/lib/tauri.ts` invoke calls with HTTP `fetch()` to `localhost:PORT`
+- Replace `src/lib/tauriEvents.ts` with polling or SSE
+- Remove all `src-tauri/src/commands/` (Tauri invoke handlers go away)
+- Keep Tauri only for: window management, system tray, native menus, app lifecycle
+- Remove `useCodexBar.ts` polling — use HTTP fetch on demand or SSE
+
+**Mobile UI (new, separate repo or workspace):**
+- React Native or Flutter app
+- Same HTTP API calls to localhost backend
+- Shares TypeScript types from `src/lib/types.ts` if using RN
 
 ---
 
@@ -14,241 +77,234 @@
 
 ```
 Token-Tracker/
-├── src-tauri/                          # Existing Tauri app (DO NOT touch React frontend)
+├── src-tauri/                          # Tauri shell (window, tray, lifecycle ONLY)
 │   ├── src/
-│   │   ├── lib.rs                     # REPLACED — CLI wrapper logic removed
-│   │   ├── main.rs                    # KEPT — Tauri window/tray bootstrap
-│   │   └── commands/                  # CREATED — Tauri invoke handlers (bridges Rust lib → React)
-│   │       ├── mod.rs
-│   │       ├── providers.rs           # refresh, cached providers
-│   │       ├── credentials.rs          # API key management
-│   │       ├── settings.rs
-│   │       └── ...
-│   ├── Cargo.toml                     # REPLACED — add Win-CodexBar deps + workspace
-│   └── tauri.conf.json                # KEPT
+│   │   ├── main.rs                     # App entry — starts backend + shows window
+│   │   ├── backend.rs                  # Spawns backend process, manages lifecycle
+│   │   └── lib.rs                     # STRIPPED — no command handlers, just tray/window
+│   └── Cargo.toml
 │
-└── src/                               # Existing React frontend (UNCHANGED)
-    ├── app/page.tsx
-    ├── components/ProviderDetail.tsx
-    ├── hooks/useCodexBar.ts
-    └── lib/dataMapping.ts             # Provider IDs must match Win-CodexBar ProviderId enum
+├── backend/                            # NEW — self-contained Rust backend
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── main.rs                     # HTTP server entry (axum or warp)
+│   │   ├── lib.rs                      # Re-exports all Win-CodexBar crates
+│   │   ├── server/
+│   │   │   ├── handlers.rs             # HTTP route handlers matching API spec above
+│   │   │   ├── middleware.rs           # CORS, auth, logging
+│   │   │   └── events.rs               # SSE / WebSocket for live updates
+│   │   └── copy/                       # Win-CodexBar rust/src/ copied here (providers, core, settings, browser, cost_scanner, notifications)
+│   └── copy/                           # Win-CodexBar rust/src/ (see "What Is Copy-Paste")
+│
+├── src/                                # Desktop React UI (UNCHANGED contract)
+│   ├── app/page.tsx
+│   ├── components/ProviderDetail.tsx
+│   ├── hooks/useCodexBar.ts            # MODIFIED — HTTP fetch instead of Tauri invoke
+│   ├── lib/
+│   │   ├── apiClient.ts                # NEW — HTTP client for backend API
+│   │   ├── tauri.ts                   # REMOVE — all invoke wrappers deleted
+│   │   └── dataMapping.ts             # Provider descriptors + logo system
+│   └── ...
+│
+└── mobile/                             # NEW — future mobile UI (separate repo or workspace)
+    └── (React Native or Flutter app)
 ```
 
 ---
 
 ## What Is Copy-Paste from Win-CodexBar
 
-### Entire Rust Library (rust/src/)
+### Entire Rust Library (copied to `backend/copy/`)
 
 ```
-Win-CodexBar/rust/src/        →  Token-Tracker/src-tauri/src/codexbar/
-├── main.rs                   — CLI entry point (NOT needed for Tauri, but copy for reference)
-├── lib.rs                    — pub mod for all crates (copy as-is)
-├── core/                     — Core traits, models, fetch pipeline (COPY)
-│   ├── lib.rs
-│   ├── provider.rs           — Provider trait + ProviderId enum
-│   ├── fetch_plan.rs         — FetchContext, pipeline strategies
-│   ├── credentials.rs         — CredentialStore trait + keyring impl
-│   └── ...
-├── providers/                — All 54 provider implementations (COPY each file)
-│   ├── lib.rs
-│   ├── claude/mod.rs
-│   ├── codex/mod.rs
-│   ├── cursor/mod.rs
-│   ├── gemini/mod.rs
-│   └── ... (all 54)
-├── settings/                 — Settings load/save (COPY)
-│   ├── mod.rs
-│   ├── api_keys.rs
-│   └── ...
-├── browser/                  — Cookie extraction (COPY, then replace Linux-specific)
-│   ├── mod.rs
-│   ├── cookies.rs             — Windows SQLite reading → rewrite for Linux
-│   └── chromium_dpapi.rs      — DROP, replace with Linux keyring
-├── cli/                       — CLI subcommands (usage, cost, diagnose) — NOT needed in Tauri
-├── status/                    — Provider status page fetcher (COPY)
-├── secure_file.rs             — Atomic file writes (COPY)
-├── notifications.rs           — System notifications (COPY, then replace Linux impl)
-├── cost_scanner.rs            — JSONL log scanning (COPY)
-└── wsl.rs                     — DROP (Windows-only)
+Win-CodexBar/rust/src/        →  Token-Tracker/backend/copy/
+├── core/                     — COPY (provider trait, FetchContext, pipeline)
+├── providers/                — COPY all 54 providers
+├── settings/                 — COPY
+├── browser/                  — COPY, then REWRITE Linux cookie extraction
+├── cost_scanner.rs           — COPY
+├── notifications.rs          — COPY, then ADAPT Linux notifications
+├── secure_file.rs             — COPY
+└── status/                    — COPY
 ```
 
-### Tauri Command Handlers (apps/desktop-tauri/src-tauri/src/commands/)
+**NOT copied:**
+- `cli/` subcommands — we use HTTP API, not CLI
+- `wsl.rs` — Windows-only
+- `tray/` — desktop-only, handled by Tauri shell
+- `main.rs` — CLI entry point replaced by `backend/src/main.rs` (HTTP server)
 
-```
-Win-CodexBar/apps/desktop-tauri/src-tauri/src/commands/
-├── mod.rs                     — ADAPT — replace codexbar::core imports with local crate
-├── providers.rs               — ADAPT — wires Tauri invoke to do_refresh_providers
-├── credentials.rs             — ADAPT — calls Linux CredentialStore instead of Windows DPAPI
-├── browser_import.rs          — REWRITE for Linux browser cookie extraction
-├── settings.rs                — COPY — Settings JSON format is portable
-├── provider_settings.rs        — COPY
-├── tokens.rs                  — COPY
-└── chart.rs                   — COPY
-```
+### Tauri Shell
+
+- `src-tauri/src/main.rs` — COPY from Win-CodexBar's `apps/desktop-tauri/src-tauri/src/main.rs` for window/tray setup patterns, then adapt for Token-Tracker
 
 ---
 
 ## What Must Be Rewritten
 
-### 1. Credential Storage (Linux keyring)
+### 1. HTTP Server (`backend/src/server/`)
 
-**Win-CodexBar:** Uses `keyring` crate backed by Windows Credential Manager.
+Win-CodexBar has no HTTP server — it's all in-memory function calls from Tauri invoke handlers. We build this from scratch using `axum` or `warp`.
 
-**Linux replacement:** Same `keyring` crate works on Linux (uses `libsecret` or `pass`). No code change needed — the `keyring` crate is cross-platform.
+**Key decisions:**
+- `axum` is simpler and widely used with Tokio — recommended
+- Authentication: the backend runs as the local user, so API calls from localhost are trusted implicitly. No auth token needed.
+- CORS: allow `http://localhost:PORT` for desktop and mobile
+- Port: use `46727` (unused standard port) or scan for first available
 
-**If keyring fails on Linux:** Fall back to `libsecret` crate directly.
+### 2. Credential Storage (Linux keyring)
 
-### 2. Browser Cookie Extraction (Linux browsers)
+Same as before — `keyring` crate backed by Linux libsecret.
 
-**Win-CodexBar:** Reads Chrome/Edge/Firefox SQLite cookies, decrypts with Windows DPAPI.
+### 3. Browser Cookie Extraction (Linux browsers)
 
-**Linux replacement:** Read browser cookie SQLite files from:
-- Chrome: `~/.config/google-chrome/Default/Cookies`
-- Chromium: `~/.config/chromium/Default/Cookies`
-- Firefox: `~/.mozilla/firefox/*/cookies.sqlite`
-- Brave: `~/.config/BraveSoftware/Brave-Browser/Default/Cookies`
+Same rewrite as planned before — Linux browser SQLite + libsecret decryption.
 
-**Encryption:** Linux browsers store cookies with `libpkcs11` or `gnome-keyring`. Use `libsecret` to decrypt, or read `~/.local/share/keyring/` blobs for Chrome's AES encryption (Chrome uses a `chrome` keyring entry).
+### 4. Notifications (Linux)
 
-**Key file to replace:**
-- `rust/src/browser/cookies.rs` → Linux implementation
-- `rust/src/browser/chromium_dpapi.rs` → DROP
+Use `notify-rust` crate or Tauri notification plugin via the Tauri shell layer.
 
-### 3. Notifications
+### 5. Backend Lifecycle Management (`src-tauri/backend.rs`)
 
-**Win-CodexBar:** Uses Windows toast notifications.
-
-**Linux replacement:** Use `notify-rust` crate or Tauri notifications plugin.
-
-### 4. System Tray Icon Updates
-
-**Win-CodexBar:** `tray_bridge.rs` updates tray icon + tooltip based on provider cache.
-
-**Token-Tracker:** Already has basic tray (see `lib.rs` tray setup). `tray_bridge.rs` logic can be copied with minor Tauri API adaptation.
-
-### 5. Global Shortcuts
-
-**Win-CodexBar:** `global-hotkey` crate.
-
-**Linux replacement:** Same crate works — `global-hotkey` supports Linux via X11/Wayland.
+The Tauri shell must:
+1. On app start: spawn the backend process (`tokio::process::Command`)
+2. Wait for backend to be ready (health check `GET /health`)
+3. On app quit: terminate the backend process
 
 ---
 
 ## Frontend Compatibility Considerations
 
-The existing React frontend communicates via Tauri `invoke()` calls. Current vs new command mapping:
+### Desktop UI Changes
 
-| Current Command | New Command | Action |
-|---|---|---|
-| `trigger_refresh` | `refresh_providers` | Calls `do_refresh_providers()` |
-| `get_usage_data` | `get_cached_providers` | Returns `Vec<ProviderUsageSnapshot>` |
-| `get_cost_data` | (stays) `get_cost_data` | Need to implement cost scanning |
-| `run_codexbar_command` | REMOVED | No longer needed |
-| `get_cli_status` | REMOVED | No CLI dependency |
-| `install_cli` | REMOVED | No CLI to install |
-| `get_cost_data` | ADD `get_cost_snapshot` | From cost_scanner.rs |
+The desktop UI currently uses Tauri `invoke()` for all operations. After migration, all data operations go through `apiClient.ts` (HTTP calls). The data shapes returned by the HTTP API must match what `dataMapping.ts` and `types.ts` expect.
 
-### Data Model Mapping
+**Adapter strategy:** The HTTP API returns the exact same JSON schema that the frontend already uses. The adapter converts Win-CodexBar Rust structs → frontend JSON. This preserves `types.ts`, `dataMapping.ts`, `ProviderDetail.tsx`, and all components unchanged.
 
-The Win-CodexBar Rust structs returned by Tauri commands differ from the current JSON format. Two options:
+**Changes needed in `src/`:**
 
-**Option A — Adapter in Tauri commands (recommended):** Convert `ProviderUsageSnapshot` (Rust) to the exact JSON shape the React frontend expects. Write a conversion function in `src-tauri/src/commands/adapter.rs`.
+| File | Change |
+|---|---|
+| `src/lib/apiClient.ts` | NEW — HTTP fetch wrapper for all backend endpoints |
+| `src/lib/tauri.ts` | DELETE — all invoke wrappers removed |
+| `src/lib/tauriEvents.ts` | REPLACE — SSE or polling instead of Tauri events |
+| `src/hooks/useCodexBar.ts` | MODIFY — call `apiClient.ts` instead of `invoke()` |
+| `src/app/page.tsx` | MINOR — remove `InstallOverlay` (no CLI), keep everything else |
+| `src/components/ProviderDetail.tsx` | MINOR — pass `theme` prop already done, no data changes |
 
-**Option B — Update React frontend:** Change `types.ts`, `dataMapping.ts`, and all components to match Win-CodexBar's Rust structs. More work, cleaner in the long run.
+**Changes needed in `src-tauri/`:**
 
-### Provider ID Compatibility
+| File | Change |
+|---|---|
+| `src-tauri/src/main.rs` | REMOVE all command handlers |
+| `src-tauri/src/backend.rs` | NEW — spawn and manage backend process lifecycle |
+| `src-tauri/src/lib.rs` | STRIP to window/tray setup only |
 
-Win-CodexBar's `ProviderId` enum uses snake_case strings matching CLI names:
-```rust
-ProviderId::Claude → "claude"
-ProviderId::Antigravity → "antigravity"  // matches dataMapping.ts
-ProviderId::OpenCode → "opencode"
-```
+### Mobile UI
 
-Verify all 35+ providers in `dataMapping.ts` match `ProviderId::from_cli_name()` lookup. Any mismatch = that provider won't display.
+Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
+- Reuse TypeScript types from `src/lib/types.ts`
+- Reuse `src/lib/dataMapping.ts` (provider descriptors, logos)
+- Build its own UI components (different UX than desktop popover)
 
 ---
 
 ## Task Breakdown
 
-### Phase 1: Scaffold
+### Phase 1: Backend HTTP Server Scaffold
 
-- [ ] **Task 1:** Fork Win-CodexBar `rust/src/` into `src-tauri/src/codexbar/` as a Rust workspace member
-- [ ] **Task 2:** Update `src-tauri/Cargo.toml` to add Win-CodexBar dependencies as workspace members
-- [ ] **Task 3:** Create `src-tauri/src/commands/mod.rs` stub importing from local `codexbar` crate
-- [ ] **Task 4:** Delete CLI-spawning code from `lib.rs` (keep tray/window setup)
+- [ ] **Task 1:** Create `backend/` directory with `Cargo.toml` — workspace setup, add Win-CodexBar deps
+- [ ] **Task 2:** Copy Win-CodexBar `rust/src/core/` → `backend/copy/core/`
+- [ ] **Task 3:** Copy Win-CodexBar `rust/src/providers/` → `backend/copy/providers/`
+- [ ] **Task 4:** Copy Win-CodexBar `rust/src/settings/` → `backend/copy/settings/`
+- [ ] **Task 5:** Copy Win-CodexBar `rust/src/cost_scanner.rs` → `backend/copy/`
+- [ ] **Task 6:** Copy Win-CodexBar `rust/src/secure_file.rs` → `backend/copy/`
+- [ ] **Task 7:** Create `backend/src/server/handlers.rs` — stub HTTP handlers returning empty/mock data
+- [ ] **Task 8:** Create `backend/src/main.rs` — axum HTTP server listening on localhost, routes match API spec
 
-### Phase 2: Core Wiring
+### Phase 2: Backend Core Logic
 
-- [ ] **Task 5:** Implement `providers.rs` command — `refresh_providers` → `do_refresh_providers`
-- [ ] **Task 6:** Implement `get_cached_providers` command — returns `Vec<ProviderUsageSnapshot>`
-- [ ] **Task 7:** Write `adapter.rs` — convert Rust structs to current JSON format React expects
-- [ ] **Task 8:** Verify `useCodexBar.ts` hook works with new Tauri commands (no CLI status check)
+- [ ] **Task 9:** Wire `GET /api/v1/providers` → `instantiate_provider()` for all enabled providers
+- [ ] **Task 10:** Wire `POST /api/v1/providers/refresh` → refresh logic from Win-CodexBar `providers.rs`
+- [ ] **Task 11:** Wire `GET /api/v1/cost` → cost scanner
+- [ ] **Task 12:** Implement `keyring` credential storage in `backend/copy/core/credentials.rs` for Linux
 
-### Phase 3: Cost
+### Phase 3: Linux-Specific Rewrites
 
-- [ ] **Task 9:** Copy `cost_scanner.rs` from Win-CodexBar
-- [ ] **Task 10:** Implement `get_cost_data` Tauri command using `CostScanner`
+- [ ] **Task 13:** Rewrite `browser/` cookie extraction for Linux browsers (Chrome, Chromium, Firefox, Brave)
+- [ ] **Task 14:** Adapt `notifications.rs` for Linux (`notify-rust` crate)
+- [ ] **Task 15:** Wire `GET /api/v1/browsers` and `POST /api/v1/browsers/import`
 
-### Phase 4: Credentials (Linux)
+### Phase 4: Tauri Shell Integration
 
-- [ ] **Task 11:** Verify `keyring` crate works on Linux for credential storage
-- [ ] **Task 12:** Adapt `credentials.rs` — same trait, `keyring` backed by Linux libsecret
-- [ ] **Task 13:** Implement `set_api_key` / `get_api_keys` / `delete_api_key` Tauri commands
+- [ ] **Task 16:** Create `src-tauri/src/backend.rs` — spawn backend process, health-check loop, shutdown
+- [ ] **Task 17:** Strip `src-tauri/src/lib.rs` — remove all command handlers, keep tray/window setup
+- [ ] **Task 18:** Wire `src-tauri/src/main.rs` → call `backend.rs` lifecycle on startup/exit
 
-### Phase 5: Browser Cookies (Linux)
+### Phase 5: Desktop UI Migration
 
-- [ ] **Task 14:** Rewrite `rust/src/browser/cookies.rs` for Linux — read Chrome/Chromium/Firefox SQLite
-- [ ] **Task 15:** Implement Linux cookie decryption (libsecret for Chrome AES key)
-- [ ] **Task 16:** Implement `list_detected_browsers` and `import_browser_cookies` Tauri commands
+- [ ] **Task 19:** Create `src/lib/apiClient.ts` — HTTP fetch wrapper matching API endpoints
+- [ ] **Task 20:** Update `src/hooks/useCodexBar.ts` — replace `invoke()` calls with `apiClient.ts`
+- [ ] **Task 21:** Replace `src/lib/tauriEvents.ts` — SSE or polling for live updates
+- [ ] **Task 22:** Delete `src/lib/tauri.ts` — all invoke wrappers removed
+- [ ] **Task 23:** Remove `InstallOverlay` from `src/app/page.tsx` — no CLI dependency
+- [ ] **Task 24:** Verify desktop UI — full refresh cycle, theme toggle, provider tabs all work
 
-### Phase 6: Notifications & Tray
+### Phase 6: Settings & Credentials API
 
-- [ ] **Task 17:** Copy `notifications.rs` — adapt Windows toast → `notify-rust` or Tauri notification plugin
-- [ ] **Task 18:** Copy `tray_bridge.rs` — update tray icon/tooltip from provider cache
+- [ ] **Task 25:** Wire `GET /api/v1/settings` and `PUT /api/v1/settings`
+- [ ] **Task 26:** Wire credential CRUD (`GET/POST/DELETE /api/v1/credentials`)
+- [ ] **Task 27:** Update desktop UI settings modal to call HTTP API instead of Tauri
 
-### Phase 7: Settings
+### Phase 7: Production Build
 
-- [ ] **Task 19:** Copy `settings.rs` — persist to `~/.config/codexbar-desktop/settings.json`
-- [ ] **Task 20:** Implement `get_settings_snapshot` / `update_settings` Tauri commands
-
-### Phase 8: Cleanup
-
-- [ ] **Task 21:** Remove `run_codexbar_command`, `get_cli_status`, `install_cli` Tauri commands
-- [ ] **Task 22:** Update React frontend — remove CLI status/InstallOverlay, provider IDs already match
-- [ ] **Task 23:** Update `ProviderDetail.tsx` — remove env-var instructions for adding accounts (use credential system instead)
-- [ ] **Task 24:** Verify full refresh cycle works — spawn app, see providers, change theme, toggle providers
-- [ ] **Task 25:** Build production binary and verify `npm run tauri:build` succeeds
+- [ ] **Task 28:** Bundle backend binary into Tauri app (add to `bundleresources` or ship alongside)
+- [ ] **Task 29:** Verify `npm run tauri:build` produces working Linux AppImage
+- [ ] **Task 30:** Test on a fresh Linux machine — no CodexBar CLI installed — verify all providers show correctly
 
 ---
 
 ## Effort Summary
 
-| Phase | Copy | Adapt | Rewrite | Notes |
-|---|---|---|---|---|
-| Scaffold | ~2 hrs | ~1 hr | — | File layout, workspace setup |
-| Core Wiring | ~4 hrs | ~3 hrs | ~2 hrs | Provider fetch, adapter |
-| Cost | ~1 hr | ~1 hr | — | Scanner is portable |
-| Credentials | ~30 min | ~2 hrs | ~1 hr | keyring cross-platform, verify |
-| Browser Cookies | — | — | ~8-16 hrs | Main rewrite effort |
-| Notifications & Tray | ~2 hrs | ~3 hrs | ~2 hrs | Linux notification APIs |
-| Settings | ~1 hr | ~2 hrs | — | Portable TOML/JSON |
-| Cleanup | — | ~2 hrs | ~1 hr | React frontend alignment |
+| Phase | Copy | Rewrite | Notes |
+|---|---|---|---|
+| Backend Scaffold | ~4 hrs | ~2 hrs | Copy structure, stub HTTP server |
+| Core Logic | ~2 hrs | ~3 hrs | Provider fetch wiring, cost |
+| Linux-Specific | — | ~10-16 hrs | Browser cookies (main effort) |
+| Tauri Shell | ~1 hr | ~3 hrs | Backend lifecycle management |
+| Desktop UI Migration | — | ~4 hrs | apiClient, useCodexBar rewrite |
+| Settings & Creds | ~1 hr | ~2 hrs | |
+| Production Build | — | ~2 hrs | Bundling, AppImage |
 
-**Total copy-paste: ~60-70%** of Rust code is direct copy.
-**Total rewrite: ~30-40%** — mostly browser cookie extraction and credential keyring on Linux.
+**Total: ~25-35 hours**
+- Copy-paste from Win-CodexBar: ~40%
+- New HTTP server layer: ~20%
+- Linux-specific rewrites: ~30%
+- UI migration: ~10%
 
 ---
 
 ## Key Risks
 
-1. **Browser cookie decryption** — Chrome on Linux uses AES encryption with a key stored in `~/.local/share/keyring/`. If the encryption scheme differs from Win-CodexBar's DPAPI approach, this could require significant reverse-engineering of Chrome's Linux keychain.
+1. **Browser cookie decryption** — Same as before. Chrome on Linux encrypts cookies with a keyring entry. If that scheme differs from Win-CodexBar's DPAPI approach, browser import requires significant reverse-engineering of Chrome's Linux encryption.
 
-2. **Provider ID mismatch** — If any provider ID in `dataMapping.ts` doesn't match `ProviderId::from_cli_name()` in Win-CodexBar, that provider silently won't display. Must add a validation step.
+2. **Backend startup latency** — The desktop app must wait for the backend process to start before making API calls. Need a robust health-check retry loop in `backend.rs`.
 
-3. **React data format drift** — The adapter approach (Option A) means carrying two data models indefinitely. Option B (update React) is cleaner but requires changing multiple frontend files.
+3. **Port conflicts** — If port 46727 is in use, need fallback port selection logic.
 
-4. **OAuth flows** — Win-CodexBar implements OAuth for some providers (Claude, Copilot). These use platform-specific URLs/redirects. OAuth is portable (web-based) but the callback URL handling may differ on Linux.
+4. **Mobile app localhost** — Mobile and desktop on the same machine can both call `localhost`. If mobile is on a different machine, it needs the backend's network address (future v2: mDNS discovery or auth-token-protected remote access).
 
-5. **Settings migration** — Existing `~/.codexbar-desktop/cache.json` is in a different format from Win-CodexBar's settings. May need a one-time migration step on first launch.
+5. **Provider ID drift** — `dataMapping.ts` provider IDs must match `ProviderId::from_cli_name()` in the copied Rust code. A mismatch silently drops a provider from the UI.
+
+6. **Settings migration** — Existing `~/.codexbar-desktop/cache.json` has a different format from the new settings system. Need a one-time migration on first launch after migration.
+
+---
+
+## Future: Mobile UI
+
+The HTTP API design enables a future React Native or Flutter mobile app with minimal effort:
+
+- Same `GET/POST /api/v1/*` calls from mobile
+- Same TypeScript types from `src/lib/types.ts` (if RN)
+- Mobile app provides its own UI (not the popover design — likely a scrollable provider list)
+- No backend changes needed for mobile UI

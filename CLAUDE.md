@@ -88,6 +88,35 @@ providerLogo(provider: string, theme: 'dark' | 'light'): string
 
 Dark mode is default. CSS variables defined in `globals.css` under `:root`; light mode overrides them under `:root.light-mode`. Theme preference persists to `localStorage`. The theme state lives in `src/app/page.tsx` and is passed down as a prop to components that need themed logos.
 
-## Backend Migration (Planned)
+## Backend Architecture (Planned Migration)
 
-See `docs/superpowers/plans/2026-06-23-backend-migration-self-contained.md` for the plan to replace CLI wrapping with a self-contained Rust backend copied from Win-CodexBar. This will make TokenTracker independent of the CodexBar CLI.
+The backend will be migrated to a self-contained Rust HTTP API server (copied from Win-CodexBar), replacing the current CLI-wrapping approach.
+
+```
+Desktop UI (Tauri/Next.js) ──HTTP──▶  Rust Backend (localhost)
+Mobile UI (future)         ──HTTP──▶  Rust Backend (localhost)
+```
+
+**Key files after migration:**
+- `backend/` — Rust HTTP API server (Win-CodexBar provider logic copied here)
+- `src-tauri/src/backend.rs` — spawns and manages backend process lifecycle
+- `src/lib/apiClient.ts` — HTTP client for backend API (replaces `tauri.ts`)
+- `src/lib/tauri.ts` — REMOVED after migration
+
+See `docs/superpowers/plans/2026-06-23-backend-migration-self-contained.md` for the full migration plan.
+
+### API Endpoints (target)
+
+```
+GET  /api/v1/providers
+GET  /api/v1/providers/{id}
+POST /api/v1/providers/refresh
+GET  /api/v1/cost
+GET  /api/v1/credentials
+POST /api/v1/credentials
+DEL  /api/v1/credentials/{id}
+GET  /api/v1/settings
+PUT  /api/v1/settings
+GET  /api/v1/browsers
+POST /api/v1/browsers/import
+```
