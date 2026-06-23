@@ -57,6 +57,9 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Regex
 regex-lite = "0.1"
 
+# Iterator utilities
+itertools = "0.14"
+
 # Finding executables
 which = "7"
 

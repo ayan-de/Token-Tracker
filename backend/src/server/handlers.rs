@@ -9,6 +9,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use itertools::Itertools;
 use chrono::{DateTime, Utc};
 
 use crate::core::{
@@ -705,7 +706,7 @@ pub async fn trigger_refresh() -> impl IntoResponse {
         .filter_map(|item| item.get("provider").and_then(|v| v.as_str()).map(String::from))
         .collect();
 
-    for installed in &installed_providers {
+    for installed in installed_providers.iter().sorted() {
         if !active_provider_names.contains(installed) {
             usage_json.push(json!({
                 "provider": installed,
