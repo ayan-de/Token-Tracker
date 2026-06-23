@@ -231,9 +231,9 @@ Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
 
 ### Phase 3: Linux-Specific Rewrites
 
-- [ ] **Task 13:** Rewrite `browser/` cookie extraction for Linux browsers (Chrome, Chromium, Firefox, Brave)
-- [ ] **Task 14:** Adapt `notifications.rs` for Linux (`notify-rust` crate)
-- [ ] **Task 15:** Wire `GET /api/v1/browsers` and `POST /api/v1/browsers/import`
+- [x] **Task 13:** Rewrite `browser/` cookie extraction for Linux browsers (Chrome, Chromium, Firefox, Brave)
+- [x] **Task 14:** Adapt `notifications.rs` for Linux (`notify-rust` crate)
+- [x] **Task 15:** Wire `GET /api/v1/browsers` and `POST /api/v1/browsers/import`
 
 ### Phase 4: Tauri Shell Integration
 
