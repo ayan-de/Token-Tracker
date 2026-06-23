@@ -235,11 +235,11 @@ Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
 - [x] **Task 14:** Adapt `notifications.rs` for Linux (`notify-rust` crate)
 - [x] **Task 15:** Wire `GET /api/v1/browsers` and `POST /api/v1/browsers/import`
 
-### Phase 4: Tauri Shell Integration
+### Phase 4: Tauri Process Lifecycle Integration
 
-- [ ] **Task 16:** Create `src-tauri/src/backend.rs` — spawn backend process, health-check loop, shutdown
-- [ ] **Task 17:** Strip `src-tauri/src/lib.rs` — remove all command handlers, keep tray/window setup
-- [ ] **Task 18:** Wire `src-tauri/src/main.rs` → call `backend.rs` lifecycle on startup/exit
+- [x] **Task 16:** Create `src-tauri/src/backend.rs` — spawn backend process, health-check loop, shutdown
+- [x] **Task 17:** Strip `src-tauri/src/lib.rs` — remove all command handlers, keep tray/window setup
+- [x] **Task 18:** Wire `src-tauri/src/main.rs` → call `backend.rs` lifecycle on startup/exit
 
 ### Phase 5: Desktop UI Migration
 
