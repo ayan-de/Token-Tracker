@@ -224,10 +224,10 @@ Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
 
 ### Phase 2: Backend Core Logic
 
-- [ ] **Task 9:** Wire `GET /api/v1/providers` → `instantiate_provider()` for all enabled providers
-- [ ] **Task 10:** Wire `POST /api/v1/providers/refresh` → refresh logic from Win-CodexBar `providers.rs`
-- [ ] **Task 11:** Wire `GET /api/v1/cost` → cost scanner
-- [ ] **Task 12:** Implement `keyring` credential storage in `backend/copy/core/credentials.rs` for Linux
+- [x] **Task 9:** Wire `GET /api/v1/providers` → `instantiate_provider()` for all enabled providers
+- [x] **Task 10:** Wire `POST /api/v1/providers/refresh` → refresh logic from Win-CodexBar `providers.rs`
+- [x] **Task 11:** Wire `GET /api/v1/cost` → cost scanner
+- [x] **Task 12:** Implement `keyring` credential storage in `backend/copy/core/credentials.rs` for Linux
 
 ### Phase 3: Linux-Specific Rewrites
 
