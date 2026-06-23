@@ -30,26 +30,21 @@ pub trait CredentialStore: Send + Sync {
     fn delete(&self, service: &str, key: &str) -> Result<(), CredentialError>;
 }
 
-/// Windows Credential Manager implementation
-#[cfg(windows)]
-pub struct WindowsCredentialStore;
+pub struct KeyringCredentialStore;
 
-#[cfg(windows)]
-impl WindowsCredentialStore {
+impl KeyringCredentialStore {
     pub fn new() -> Self {
         Self
     }
 }
 
-#[cfg(windows)]
-impl Default for WindowsCredentialStore {
+impl Default for KeyringCredentialStore {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[cfg(windows)]
-impl CredentialStore for WindowsCredentialStore {
+impl CredentialStore for KeyringCredentialStore {
     fn get(&self, service: &str, key: &str) -> Result<String, CredentialError> {
         let entry = keyring::Entry::new(service, key)
             .map_err(|e| CredentialError::Storage(e.to_string()))?;
@@ -77,6 +72,10 @@ impl CredentialStore for WindowsCredentialStore {
         })
     }
 }
+
+/// Type alias for Windows compatibility
+#[cfg(windows)]
+pub type WindowsCredentialStore = KeyringCredentialStore;
 
 /// OAuth credentials structure
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
