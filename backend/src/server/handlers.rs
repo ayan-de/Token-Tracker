@@ -593,10 +593,14 @@ fn scan_cost_history() -> serde_json::Value {
 
 fn get_active_providers() -> Vec<ProviderId> {
     let settings = Settings::load();
+    let ordered_names = settings.provider_display_order_names();
+    let enabled: HashSet<String> = settings.enabled_providers.iter().cloned().collect();
     let mut providers = Vec::new();
-    for name in &settings.enabled_providers {
-        if let Some(id) = ProviderId::from_cli_name(name) {
-            providers.push(id);
+    for name in &ordered_names {
+        if enabled.contains(name) {
+            if let Some(id) = ProviderId::from_cli_name(name) {
+                providers.push(id);
+            }
         }
     }
     // If no providers are enabled, default to Claude, Codex, Gemini
