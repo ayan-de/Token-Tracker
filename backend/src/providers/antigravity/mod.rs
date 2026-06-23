@@ -8,6 +8,7 @@ use regex_lite::Regex;
 use serde::Deserialize;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
+#[cfg(windows)]
 use std::process::Command;
 use std::sync::OnceLock;
 
@@ -40,9 +41,9 @@ impl AntigravityProvider {
     }
 
     /// Detect running Antigravity language server and extract connection info
+    #[cfg(windows)]
     fn detect_process_info() -> Result<ProcessInfo, ProviderError> {
         // Use PowerShell to get process command lines
-        #[cfg(windows)]
         const CREATE_NO_WINDOW: u32 = 0x08000000;
 
         let mut cmd = Command::new("powershell.exe");
@@ -51,7 +52,6 @@ impl AntigravityProvider {
                 "-Command",
                 "Get-CimInstance Win32_Process | Where-Object { $_.Name -like '*language_server_windows*' } | ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }"
             ]);
-        #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
         let output = cmd
@@ -108,6 +108,83 @@ impl AntigravityProvider {
                         extension_server_csrf_token: ext_csrf_token,
                         extension_port: p,
                         pid,
+                    });
+                }
+            }
+        }
+
+        Err(ProviderError::NotInstalled(
+            "Antigravity language server not running".to_string(),
+        ))
+    }
+
+    /// Detect running Antigravity language server and extract connection info on Linux/macOS
+    #[cfg(not(windows))]
+    fn detect_process_info() -> Result<ProcessInfo, ProviderError> {
+        // Scan /proc directory
+        let proc_dir = std::fs::read_dir("/proc")
+            .map_err(|e| ProviderError::Other(format!("Failed to read /proc: {}", e)))?;
+
+        static CSRF_RE: OnceLock<Regex> = OnceLock::new();
+        static EXT_CSRF_RE: OnceLock<Regex> = OnceLock::new();
+        static PORT_RE: OnceLock<Regex> = OnceLock::new();
+        let csrf_regex = CSRF_RE
+            .get_or_init(|| Regex::new(r"--csrf_token\s+([a-f0-9-]+)").expect("valid regex"));
+        let ext_csrf_regex = EXT_CSRF_RE.get_or_init(|| {
+            Regex::new(r"--extension_server_csrf_token\s+([a-f0-9-]+)").expect("valid regex")
+        });
+        let port_regex = PORT_RE
+            .get_or_init(|| Regex::new(r"--extension_server_port\s+(\d+)").expect("valid regex"));
+
+        for entry in proc_dir.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+
+            let pid_str = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let Ok(pid) = pid_str.parse::<u32>() else {
+                continue;
+            };
+
+            let cmdline_path = path.join("cmdline");
+            let Ok(cmdline_bytes) = std::fs::read(&cmdline_path) else {
+                continue;
+            };
+
+            // /proc/<pid>/cmdline arguments are null-terminated.
+            // Replace null bytes with spaces to reconstruct a command-line string.
+            let cmdline = cmdline_bytes
+                .iter()
+                .map(|&b| if b == 0 { b' ' } else { b })
+                .collect::<Vec<u8>>();
+            let cmdline_str = String::from_utf8_lossy(&cmdline);
+
+            // Antigravity (Codeium) language server is named language_server_linux or codeium
+            if (cmdline_str.contains("language_server") || cmdline_str.contains("codeium") || cmdline_str.contains("antigravity"))
+                && cmdline_str.contains("--csrf_token")
+            {
+                let csrf_token = csrf_regex
+                    .captures(&cmdline_str)
+                    .and_then(|c| c.get(1))
+                    .map(|m| m.as_str().to_string());
+
+                let ext_csrf_token = ext_csrf_regex
+                    .captures(&cmdline_str)
+                    .and_then(|c| c.get(1))
+                    .map(|m| m.as_str().to_string());
+
+                let port = port_regex
+                    .captures(&cmdline_str)
+                    .and_then(|c| c.get(1))
+                    .and_then(|m| m.as_str().parse::<u16>().ok());
+
+                if let (Some(token), Some(p)) = (csrf_token, port) {
+                    return Ok(ProcessInfo {
+                        csrf_token: token,
+                        extension_server_csrf_token: ext_csrf_token,
+                        extension_port: p,
+                        pid: Some(pid),
                     });
                 }
             }
