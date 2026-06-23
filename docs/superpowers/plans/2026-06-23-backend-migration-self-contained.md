@@ -213,14 +213,14 @@ Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
 
 ### Phase 1: Backend HTTP Server Scaffold
 
-- [ ] **Task 1:** Create `backend/` directory with `Cargo.toml` — workspace setup, add Win-CodexBar deps
-- [ ] **Task 2:** Copy Win-CodexBar `rust/src/core/` → `backend/copy/core/`
-- [ ] **Task 3:** Copy Win-CodexBar `rust/src/providers/` → `backend/copy/providers/`
-- [ ] **Task 4:** Copy Win-CodexBar `rust/src/settings/` → `backend/copy/settings/`
-- [ ] **Task 5:** Copy Win-CodexBar `rust/src/cost_scanner.rs` → `backend/copy/`
-- [ ] **Task 6:** Copy Win-CodexBar `rust/src/secure_file.rs` → `backend/copy/`
-- [ ] **Task 7:** Create `backend/src/server/handlers.rs` — stub HTTP handlers returning empty/mock data
-- [ ] **Task 8:** Create `backend/src/main.rs` — axum HTTP server listening on localhost, routes match API spec
+- [x] **Task 1:** Create `backend/` directory with `Cargo.toml` — workspace setup, add Win-CodexBar deps
+- [x] **Task 2:** Copy Win-CodexBar `rust/src/core/` → `backend/copy/core/`
+- [x] **Task 3:** Copy Win-CodexBar `rust/src/providers/` → `backend/copy/providers/`
+- [x] **Task 4:** Copy Win-CodexBar `rust/src/settings/` → `backend/copy/settings/`
+- [x] **Task 5:** Copy Win-CodexBar `rust/src/cost_scanner.rs` → `backend/copy/`
+- [x] **Task 6:** Copy Win-CodexBar `rust/src/secure_file.rs` → `backend/copy/`
+- [x] **Task 7:** Create `backend/src/server/handlers.rs` — stub HTTP handlers returning empty/mock data
+- [x] **Task 8:** Create `backend/src/main.rs` — axum HTTP server listening on localhost, routes match API spec
 
 ### Phase 2: Backend Core Logic
 
