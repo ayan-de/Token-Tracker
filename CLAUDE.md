@@ -36,11 +36,11 @@ CodexBar CLI (codexbar usage/cost --json)
 
 ### Key Files
 
-- `src-tauri/src/lib.rs` — All Rust backend logic: CLI path detection, provider discovery, cache read/write, `trigger_refresh` spawns async task and emits events
+- `src-tauri/src/lib.rs` — All Rust backend logic: CLI path detection, provider discovery, cache read/write, `trigger_refresh` spawns async task and emits events. On Linux, clears `LD_LIBRARY_PATH` and `LD_PRELOAD` before spawning CLI to avoid AppImage dynamic linker conflicts.
 - `src/lib/tauri.ts` — Tauri `invoke` wrappers for all commands
 - `src/lib/tauriEvents.ts` — Tauri event listeners (`onDataSynced`, `onSyncError`)
 - `src/hooks/useCodexBar.ts` — Central React hook; owns all provider/cost state, polling, error handling
-- `src/lib/dataMapping.ts` — `mapCLIUsage` / `mapCLICost` transform raw CLI JSON → typed `ProviderUsage` / `CostItem`; also defines `PROVIDER_DESCRIPTORS` (display names, rate window labels per provider)
+- `src/lib/dataMapping.ts` — `mapCLIUsage`/`mapCLICost` transform raw CLI JSON → typed objects; `PROVIDER_DESCRIPTORS` defines display names, logos, rate window labels per provider
 - `src/app/page.tsx` — Root page; composes all UI sections, owns theme/modal state
 
 ### Rust Command Handlers
@@ -60,16 +60,34 @@ The Rust layer merges fresh CLI responses with cached data. When a provider erro
 
 ### Provider Detection
 
-Providers are detected by checking if their CLI executable exists on `PATH`. See `detect_installed_providers` and `PROVIDER_COMMANDS` constant in `lib.rs`.
+Providers are detected by checking if their CLI executable exists on PATH. See `detect_installed_providers` and `PROVIDER_COMMANDS` constant in `lib.rs`.
+
+## Logo System
+
+Logos live in `public/logos/` and are served as static assets. Provider logos support light/dark theme variants.
+
+**Naming convention:** `xxx-light.svg` (light mode default) + `xxx-dark.svg` (dark mode). When a provider has both, the descriptor has both `logo` and `logoDark` fields.
+
+**Usage in components:**
+```typescript
+providerLogo(provider: string, theme: 'dark' | 'light'): string
+// Returns logoDark for dark theme, logo for light theme
+```
+
+**Selected tab color handling:** Light mode selected tabs use `text-black`, dark mode uses `text-white`. Logo CSS filter inversion is NOT used — themed logo variants are shown instead.
 
 ## UI Structure
 
-- `Header` — App title, refresh button, theme toggle
-- `ProviderDetail` — Selected provider's rate windows, cost breakdown, account info
+- `src/app/page.tsx` — Root page; tab switcher, provider detail area, theme/modal state
+- `src/components/ProviderDetail.tsx` — Selected provider's rate windows, cost breakdown, account info; receives `theme` prop for logo variant
 - `StatusBadge`, `ProgressBar`, `CostCard`, `ProviderCard` — Reusable display components
 - `CLITerminal` — Collapsible terminal drawer for running arbitrary CLI commands
 - `InstallOverlay` — Shown when CodexBar CLI is not detected
 
 ## Theme System
 
-Dark mode is default. CSS variables defined in `globals.css` under `:root`; light mode overrides them under `:root.light-mode`. Theme preference persists to `localStorage`.
+Dark mode is default. CSS variables defined in `globals.css` under `:root`; light mode overrides them under `:root.light-mode`. Theme preference persists to `localStorage`. The theme state lives in `src/app/page.tsx` and is passed down as a prop to components that need themed logos.
+
+## Backend Migration (Planned)
+
+See `docs/superpowers/plans/2026-06-23-backend-migration-self-contained.md` for the plan to replace CLI wrapping with a self-contained Rust backend copied from Win-CodexBar. This will make TokenTracker independent of the CodexBar CLI.
