@@ -7,7 +7,7 @@ import ProviderDetail from "@/components/ProviderDetail";
 import CLITerminal from "@/components/CLITerminal";
 import InstallOverlay from "@/components/InstallOverlay";
 import { getProviderGradient } from "@/lib/utils";
-import { PROVIDER_DESCRIPTORS } from "@/lib/dataMapping";
+import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 
 export default function HomePage() {
   const {
@@ -143,11 +143,19 @@ export default function HomePage() {
                     onClick={() => setSelectedProvider(p.provider)}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer border-0 outline-none focus:outline-none ${
                       isSelected
-                        ? "bg-accent-blue text-white shadow-md shadow-accent-blue/15 scale-[1.03] focus:bg-accent-blue focus:text-white"
+                        ? `bg-accent-blue ${theme === 'light' ? 'text-black' : 'text-white'} shadow-md shadow-accent-blue/15 scale-[1.03] focus:bg-accent-blue ${theme === 'light' ? 'focus:text-black' : 'focus:text-white'}`
                         : "bg-bg-subtle text-text-muted hover:text-text-main hover:bg-hover-subtle focus:bg-bg-subtle focus:text-text-main"
                     }`}
                   >
-                    <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
+                    {providerLogo(p.provider, theme) ? (
+                      <img
+                        src={providerLogo(p.provider, theme)}
+                        alt=""
+                        className="w-4 h-4 object-contain"
+                      />
+                    ) : (
+                      <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
+                    )}
                     <span>{desc.displayName}</span>
                   </button>
                 );
@@ -159,6 +167,7 @@ export default function HomePage() {
               <ProviderDetail
                 provider={activeProviderObj}
                 costItem={activeCostItem}
+                theme={theme}
                 onOpenAddAccountModal={(prov) => setAddAccountProvider(prov)}
                 onOpenSettingsModal={() => setSettingsOpen(true)}
                 onOpenAboutModal={() => setAboutOpen(true)}

@@ -2,56 +2,65 @@ import type { ProviderUsage, CostItem, RawCliUsageItem, RawCliCostItem, Provider
 
 export interface ProviderDescriptor {
   displayName: string;
+  logo: string;
+  logoDark?: string;
   sessionLabel: string;
   weeklyLabel: string;
   opusLabel?: string | null;
 }
 
 export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
-  claude: { displayName: "Claude", sessionLabel: "Session", weeklyLabel: "Weekly", opusLabel: "Sonnet" },
-  gemini: { displayName: "Gemini", sessionLabel: "Pro", weeklyLabel: "Flash", opusLabel: "Flash Lite" },
-  antigravity: { displayName: "Antigravity", sessionLabel: "Gemini Models", weeklyLabel: "Claude and GPT" },
-  codex: { displayName: "Codex", sessionLabel: "Session", weeklyLabel: "Weekly" },
-  cursor: { displayName: "Cursor", sessionLabel: "Total", weeklyLabel: "Auto", opusLabel: "API" },
-  ollama: { displayName: "Ollama", sessionLabel: "Session", weeklyLabel: "Weekly" },
-  openrouter: { displayName: "OpenRouter", sessionLabel: "Credits", weeklyLabel: "Usage" },
-  perplexity: { displayName: "Perplexity", sessionLabel: "Credits", weeklyLabel: "Bonus credits", opusLabel: "Purchased" },
-  mistral: { displayName: "Mistral", sessionLabel: "Monthly", weeklyLabel: "" },
-  deepseek: { displayName: "DeepSeek", sessionLabel: "Balance", weeklyLabel: "Balance" },
-  groq: { displayName: "Groq", sessionLabel: "Requests", weeklyLabel: "Tokens" },
-  grok: { displayName: "Grok", sessionLabel: "Credits", weeklyLabel: "On-demand" },
-  opencode: { displayName: "OpenCode", sessionLabel: "5-hour", weeklyLabel: "Weekly" },
-  opencodego: { displayName: "OpenCode Go", sessionLabel: "5-hour", weeklyLabel: "Weekly" },
-  factory: { displayName: "Factory", sessionLabel: "Standard", weeklyLabel: "Premium" },
-  copilot: { displayName: "Copilot", sessionLabel: "Premium", weeklyLabel: "Chat" },
-  zai: { displayName: "z.ai", sessionLabel: "Tokens", weeklyLabel: "MCP" },
-  minimax: { displayName: "MiniMax", sessionLabel: "Prompts", weeklyLabel: "Window" },
-  kimi: { displayName: "Kimi", sessionLabel: "Weekly", weeklyLabel: "Rate Limit" },
-  kilo: { displayName: "Kilo", sessionLabel: "Credits", weeklyLabel: "Kilo Pass" },
-  kiro: { displayName: "Kiro", sessionLabel: "Credits", weeklyLabel: "Bonus" },
-  augment: { displayName: "Augment", sessionLabel: "Credits", weeklyLabel: "Usage" },
-  kimik2: { displayName: "Kimi K2", sessionLabel: "Credits", weeklyLabel: "Credits" },
-  moonshot: { displayName: "Moonshot", sessionLabel: "Balance", weeklyLabel: "Balance" },
-  amp: { displayName: "Amp", sessionLabel: "Amp Free", weeklyLabel: "Balance" },
-  synthetic: { displayName: "Synthetic", sessionLabel: "Five-hour quota", weeklyLabel: "Weekly tokens", opusLabel: "Search hourly" },
-  warp: { displayName: "Warp", sessionLabel: "Credits", weeklyLabel: "Add-on credits" },
-  windsurf: { displayName: "Windsurf", sessionLabel: "Daily", weeklyLabel: "Weekly" },
-  zed: { displayName: "Zed", sessionLabel: "Credits", weeklyLabel: "" },
-  mimo: { displayName: "MiMo", sessionLabel: "Credits", weeklyLabel: "Window" },
-  doubao: { displayName: "Doubao", sessionLabel: "Requests", weeklyLabel: "Rate limit" },
-  crof: { displayName: "Crof", sessionLabel: "Requests", weeklyLabel: "Credits" },
-  venice: { displayName: "Venice", sessionLabel: "Usage", weeklyLabel: "Usage" },
-  stepfun: { displayName: "StepFun", sessionLabel: "Credits", weeklyLabel: "Usage" },
-  deepgram: { displayName: "Deepgram", sessionLabel: "Requests", weeklyLabel: "Usage" },
-  poe: { displayName: "Poe", sessionLabel: "Points", weeklyLabel: "Points" },
-  chutes: { displayName: "Chutes", sessionLabel: "4-hour quota", weeklyLabel: "Monthly quota" },
-  commandcode: { displayName: "Command Code", sessionLabel: "Monthly credits", weeklyLabel: "Monthly" },
+  claude:     { displayName: "Claude",     logo: "/logos/claude_code.svg",       sessionLabel: "Session", weeklyLabel: "Weekly", opusLabel: "Sonnet" },
+  gemini:     { displayName: "Gemini",     logo: "/logos/gemini.svg",          sessionLabel: "Pro", weeklyLabel: "Flash", opusLabel: "Flash Lite" },
+  antigravity:{ displayName: "Antigravity",logo: "/logos/antigravity-color.svg",          sessionLabel: "Gemini Models", weeklyLabel: "Claude and GPT" },
+  codex:      { displayName: "Codex",      logo: "/logos/codex.svg",           sessionLabel: "Session", weeklyLabel: "Weekly" },
+  cursor:     { displayName: "Cursor",     logo: "/logos/cursor_light.svg",    logoDark: "/logos/cursor_dark.svg",    sessionLabel: "Total", weeklyLabel: "Auto", opusLabel: "API" },
+  ollama:     { displayName: "Ollama",     logo: "/logos/ollama-light.svg",     logoDark: "/logos/ollama-dark.svg", sessionLabel: "Session", weeklyLabel: "Weekly" },
+  openrouter: { displayName: "OpenRouter",logo: "/logos/openrouter.svg",      sessionLabel: "Credits", weeklyLabel: "Usage" },
+  perplexity: { displayName: "Perplexity",logo: "",                          sessionLabel: "Credits", weeklyLabel: "Bonus credits", opusLabel: "Purchased" },
+  mistral:    { displayName: "Mistral",    logo: "/logos/mistral.svg",         sessionLabel: "Monthly", weeklyLabel: "" },
+  deepseek:   { displayName: "DeepSeek",  logo: "/logos/deepseek.svg",        sessionLabel: "Balance", weeklyLabel: "Balance" },
+  groq:       { displayName: "Groq",       logo: "",                          sessionLabel: "Requests", weeklyLabel: "Tokens" },
+  grok:       { displayName: "Grok",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "On-demand" },
+  opencode:   { displayName: "OpenCode",   logo: "/logos/opencode.svg",                          sessionLabel: "5-hour", weeklyLabel: "Weekly" },
+  opencodego: { displayName: "OpenCode Go",logo: "/logos/opencode.svg",      sessionLabel: "5-hour", weeklyLabel: "Weekly" },
+  factory:    { displayName: "Factory",    logo: "",                          sessionLabel: "Standard", weeklyLabel: "Premium" },
+  copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat" },
+  zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
+  minimax:   { displayName: "MiniMax",     logo: "",                          sessionLabel: "Prompts", weeklyLabel: "Window" },
+  kimi:       { displayName: "Kimi",       logo: "",                          sessionLabel: "Weekly", weeklyLabel: "Rate Limit" },
+  kilo:       { displayName: "Kilo",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Kilo Pass" },
+  kiro:       { displayName: "Kiro",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Bonus" },
+  augment:    { displayName: "Augment",    logo: "",                          sessionLabel: "Credits", weeklyLabel: "Usage" },
+  kimik2:     { displayName: "Kimi K2",   logo: "",                          sessionLabel: "Credits", weeklyLabel: "Credits" },
+  moonshot:   { displayName: "Moonshot",   logo: "",                          sessionLabel: "Balance", weeklyLabel: "Balance" },
+  amp:        { displayName: "Amp",         logo: "",                          sessionLabel: "Amp Free", weeklyLabel: "Balance" },
+  synthetic:  { displayName: "Synthetic", logo: "",                          sessionLabel: "Five-hour quota", weeklyLabel: "Weekly tokens", opusLabel: "Search hourly" },
+  warp:       { displayName: "Warp",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Add-on credits" },
+  windsurf:   { displayName: "Windsurf",   logo: "/logos/windsurf_light.svg", logoDark: "/logos/windsurf_dark.svg", sessionLabel: "Daily", weeklyLabel: "Weekly" },
+  zed:        { displayName: "Zed",         logo: "",                          sessionLabel: "Credits", weeklyLabel: "" },
+  mimo:       { displayName: "MiMo",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Window" },
+  doubao:     { displayName: "Doubao",     logo: "",                          sessionLabel: "Requests", weeklyLabel: "Rate limit" },
+  crof:       { displayName: "Crof",       logo: "",                          sessionLabel: "Requests", weeklyLabel: "Credits" },
+  venice:     { displayName: "Venice",     logo: "",                          sessionLabel: "Usage", weeklyLabel: "Usage" },
+  stepfun:    { displayName: "StepFun",   logo: "",                          sessionLabel: "Credits", weeklyLabel: "Usage" },
+  deepgram:   { displayName: "Deepgram",   logo: "/logos/deepseek.svg",       sessionLabel: "Requests", weeklyLabel: "Usage" },
+  poe:        { displayName: "Poe",         logo: "",                          sessionLabel: "Points", weeklyLabel: "Points" },
+  chutes:     { displayName: "Chutes",     logo: "",                          sessionLabel: "4-hour quota", weeklyLabel: "Monthly quota" },
+  commandcode:{ displayName: "Command Code",logo: "",                        sessionLabel: "Monthly credits", weeklyLabel: "Monthly" },
 };
 
 function providerLabel(provider: string, explicitLabel?: string): string {
   const desc = PROVIDER_DESCRIPTORS[provider.toLowerCase()];
   if (desc) return desc.displayName;
   return explicitLabel || provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+export function providerLogo(provider: string, theme: 'dark' | 'light' = 'dark'): string {
+  const desc = PROVIDER_DESCRIPTORS[provider.toLowerCase()];
+  if (!desc) return "";
+  if (theme === 'dark' && desc.logoDark) return desc.logoDark;
+  return desc.logo || "";
 }
 
 export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {

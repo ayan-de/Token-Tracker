@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ProviderUsage, CostItem } from "@/lib/types";
-import { PROVIDER_DESCRIPTORS } from "@/lib/dataMapping";
+import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -22,6 +22,7 @@ export const PROVIDER_URLS: Record<string, { dashboard: string; statusPage: stri
 interface ProviderDetailProps {
   provider: ProviderUsage;
   costItem?: CostItem;
+  theme: 'dark' | 'light';
   onOpenAddAccountModal: (provider: string) => void;
   onOpenSettingsModal: () => void;
   onOpenAboutModal: () => void;
@@ -43,6 +44,7 @@ function formatRelativeTime(sec: number | null | undefined): string {
 export default function ProviderDetail({
   provider: p,
   costItem,
+  theme,
   onOpenAddAccountModal,
   onOpenSettingsModal,
   onOpenAboutModal,
@@ -134,9 +136,14 @@ export default function ProviderDetail({
       
       {/* Provider General Header */}
       <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-        <div className="flex flex-col">
-          <h2 className="text-lg font-bold text-text-main leading-tight">{desc.displayName}</h2>
-          <span className="text-[11px] text-text-muted/75">{lastUpdatedText}</span>
+        <div className="flex items-center gap-3">
+          {providerLogo(p.provider, theme) && (
+            <img src={providerLogo(p.provider, theme)} alt="" className="w-8 h-8 object-contain" />
+          )}
+          <div className="flex flex-col">
+            <h2 className="text-lg font-bold text-text-main leading-tight">{desc.displayName}</h2>
+            <span className="text-[11px] text-text-muted/75">{lastUpdatedText}</span>
+          </div>
         </div>
         {u?.loginMethod && (
           <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-bg-subtle text-text-main border border-border-subtle">
