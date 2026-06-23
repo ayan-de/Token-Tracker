@@ -430,6 +430,11 @@ impl CookieExtractor {
             if !crate::wsl::is_wsl() {
                 let has_v10_prefix = encrypted_value.len() >= 3 && &encrypted_value[0..3] == b"v10";
                 let has_v11_prefix = encrypted_value.len() >= 3 && &encrypted_value[0..3] == b"v11";
+                let has_v20_prefix = encrypted_value.len() >= 3 && &encrypted_value[0..3] == b"v20";
+
+                if has_v20_prefix {
+                    return Err(CookieError::AppBoundEncryption);
+                }
 
                 if has_v10_prefix || has_v11_prefix {
                     let ciphertext = &encrypted_value[3..];

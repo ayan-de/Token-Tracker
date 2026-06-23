@@ -5,7 +5,7 @@
   "identifier": "com.ayan-de.tokentracker",
   "build": {
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "cargo build -p backend && npm run dev",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../out"
   },
