@@ -1,6 +1,9 @@
 //! Gemini API client for fetching quota information
 //!
-//! Uses Google Cloud Code Private API with OAuth tokens from ~/.gemini/oauth_creds.json
+//! Uses Google Cloud Code Private API with OAuth tokens.
+//! Credentials are sourced from (in order of preference):
+//!   1. System keyring (stored by the Gemini CLI on Linux via libsecret)
+//!   2. ~/.gemini/oauth_creds.json (legacy / Windows)
 
 use crate::core::{FetchContext, ProviderError, RateWindow};
 use chrono::{DateTime, Utc};
@@ -78,20 +81,95 @@ impl GeminiApi {
     }
 
     fn load_credentials(&self) -> Result<OAuthCredentials, ProviderError> {
-        let creds_path = self.home_dir.join(".gemini").join("oauth_creds.json");
-
-        if !creds_path.exists() {
-            return Err(ProviderError::NotInstalled(
-                "Not logged in to Gemini. Run 'gemini' in Terminal to authenticate.".to_string(),
-            ));
+        // 1. Try system keyring first (used by Gemini CLI on Linux via libsecret)
+        if let Ok(creds) = self.load_credentials_from_keyring() {
+            tracing::debug!("Gemini: loaded credentials from system keyring");
+            return Ok(creds);
         }
 
-        let content = std::fs::read_to_string(&creds_path).map_err(|e| {
-            ProviderError::Other(format!("Failed to read Gemini credentials: {}", e))
+        // 2. Fall back to ~/.gemini/oauth_creds.json
+        let creds_path = self.home_dir.join(".gemini").join("oauth_creds.json");
+        if creds_path.exists() {
+            let content = std::fs::read_to_string(&creds_path).map_err(|e| {
+                ProviderError::Other(format!("Failed to read Gemini credentials: {}", e))
+            })?;
+            return serde_json::from_str(&content)
+                .map_err(|e| ProviderError::Parse(format!("Invalid Gemini credentials: {}", e)));
+        }
+
+        Err(ProviderError::NotInstalled(
+            "Not logged in to Gemini. Run 'gemini' in Terminal to authenticate.".to_string(),
+        ))
+    }
+
+    /// Load OAuth credentials from the system keyring.
+    /// The Gemini CLI stores a JSON blob under service="gemini" in the system secret store.
+    /// The blob has the shape: {"token":{"access_token":"...","refresh_token":"...","expiry":"..."},...}
+    fn load_credentials_from_keyring(&self) -> Result<OAuthCredentials, ProviderError> {
+        // The keyring crate looks up entries by (service, username). Gemini CLI uses
+        // service="gemini" and various usernames. We iterate common account names.
+        let service = "gemini";
+        let possible_usernames = self.keyring_usernames();
+
+        for username in &possible_usernames {
+            let entry = keyring::Entry::new(service, username)
+                .map_err(|e| ProviderError::Other(format!("Keyring error: {}", e)))?;
+
+            let secret = match entry.get_password() {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            if let Ok(creds) = self.parse_keyring_secret(&secret) {
+                return Ok(creds);
+            }
+        }
+
+        Err(ProviderError::NotInstalled(
+            "Gemini credentials not found in keyring".to_string(),
+        ))
+    }
+
+    /// Returns the list of possible keyring usernames to try.
+    /// Gemini CLI uses the app name as the account (e.g. "antigravity", "gemini", the user's login).
+    fn keyring_usernames(&self) -> Vec<String> {
+        let mut names: Vec<String> = Vec::new();
+
+        // The label in the keyring is "Password for '<account>' on 'gemini'"
+        // Common account names used by different editors/CLIs:
+        if let Ok(user) = std::env::var("USER").or_else(|_| std::env::var("LOGNAME")) {
+            names.push(user);
+        }
+        names.push("antigravity".to_string());
+        names.push("gemini".to_string());
+        names.push("google".to_string());
+        names.push("gemini-cli".to_string());
+
+        names
+    }
+
+    /// Parse the JSON blob stored in the keyring by the Gemini CLI.
+    fn parse_keyring_secret(&self, secret: &str) -> Result<OAuthCredentials, ProviderError> {
+        let raw: KeyringSecret = serde_json::from_str(secret)
+            .map_err(|e| ProviderError::Parse(format!("Invalid keyring JSON: {}", e)))?;
+
+        let token = raw.token.ok_or_else(|| {
+            ProviderError::NotInstalled("Keyring entry has no token field".to_string())
         })?;
 
-        serde_json::from_str(&content)
-            .map_err(|e| ProviderError::Parse(format!("Invalid Gemini credentials: {}", e)))
+        // Convert the RFC3339 expiry string to milliseconds since epoch
+        let expiry_ms = token.expiry.as_deref().and_then(|s| {
+            DateTime::parse_from_rfc3339(s)
+                .ok()
+                .map(|dt| dt.timestamp() as f64 * 1000.0)
+        });
+
+        Ok(OAuthCredentials {
+            access_token: token.access_token,
+            id_token: None,
+            refresh_token: token.refresh_token,
+            expiry_date: expiry_ms,
+        })
     }
 
     async fn refresh_token(
@@ -440,6 +518,20 @@ struct OAuthCredentials {
     id_token: Option<String>,
     refresh_token: Option<String>,
     expiry_date: Option<f64>, // milliseconds since epoch
+}
+
+/// Shape of the JSON blob stored in the system keyring by the Gemini CLI.
+#[derive(Debug, Deserialize)]
+struct KeyringSecret {
+    token: Option<KeyringToken>,
+}
+
+#[derive(Debug, Deserialize)]
+struct KeyringToken {
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    /// RFC3339 expiry timestamp, e.g. "2026-06-23T21:44:52.473755478+05:30"
+    expiry: Option<String>,
 }
 
 impl OAuthCredentials {
