@@ -694,9 +694,30 @@ pub async fn trigger_refresh() -> impl IntoResponse {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
-    
+
     let cached_payload = read_cache();
     let mut installed_providers = detect_installed_providers();
+
+    // Add entries for installed providers that are not in usage_json
+    // (they may be installed but not enabled in settings)
+    let active_provider_names: HashSet<String> = usage_json
+        .iter()
+        .filter_map(|item| item.get("provider").and_then(|v| v.as_str()).map(String::from))
+        .collect();
+
+    for installed in &installed_providers {
+        if !active_provider_names.contains(installed) {
+            usage_json.push(json!({
+                "provider": installed,
+                "source": "auto",
+                "error": {
+                    "code": 1,
+                    "kind": "provider",
+                    "message": "Provider not enabled or not configured",
+                }
+            }));
+        }
+    }
     
     for item in &usage_json {
         if has_usage_data(item) {
