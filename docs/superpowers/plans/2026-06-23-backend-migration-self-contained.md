@@ -252,9 +252,9 @@ Mobile app makes the same HTTP API calls to `localhost`. If using React Native:
 
 ### Phase 6: Settings & Credentials API
 
-- [ ] **Task 25:** Wire `GET /api/v1/settings` and `PUT /api/v1/settings`
-- [ ] **Task 26:** Wire credential CRUD (`GET/POST/DELETE /api/v1/credentials`)
-- [ ] **Task 27:** Update desktop UI settings modal to call HTTP API instead of Tauri
+- [x] **Task 25:** Wire `GET /api/v1/settings` and `PUT /api/v1/settings`
+- [x] **Task 26:** Wire credential CRUD (`GET/POST/DELETE /api/v1/credentials`)
+- [x] **Task 27:** Update desktop UI settings modal to call HTTP API instead of Tauri
 
 ### Phase 7: Production Build
 
