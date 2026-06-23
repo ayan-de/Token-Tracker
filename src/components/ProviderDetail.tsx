@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import type { ProviderUsage, CostItem } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
@@ -208,14 +208,18 @@ export default function ProviderDetail({
             )}
 
             {/* Extra named windows */}
-            {u?.extraRateWindows?.map((ew) => renderProgressRow(
-              ew.title,
-              ew.window.usedPercent,
-              ew.window.resetsAt,
-              ew.window.resetDescription,
-              ew.window.used,
-              ew.window.limit,
-              ew.window.unit
+            {u?.extraRateWindows?.map((ew) => (
+              <Fragment key={ew.title}>
+                {renderProgressRow(
+                  ew.title,
+                  ew.window.usedPercent,
+                  ew.window.resetsAt,
+                  ew.window.resetDescription,
+                  ew.window.used,
+                  ew.window.limit,
+                  ew.window.unit
+                )}
+              </Fragment>
             ))}
 
             {/* Extra Usage (Spend Limit / providerCost) */}
