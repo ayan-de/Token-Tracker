@@ -3,6 +3,7 @@
 import type { ProviderUsage, CostItem } from "@/lib/types";
 import ProviderStatus from "./ProviderStatus";
 import LimitStatusBars from "./LimitStatusBars";
+import LimitLineGraph from "./LimitLineGraph";
 import CreditsCost from "./CreditsCost";
 import ActionMenu from "./ActionMenu";
 
@@ -35,6 +36,8 @@ export default function ProviderDetail({
         provider={provider}
         onOpenAddAccountModal={onOpenAddAccountModal}
       />
+
+      <LimitLineGraph provider={provider} />
 
       <CreditsCost
         provider={provider}
