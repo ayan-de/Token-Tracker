@@ -758,9 +758,90 @@ pub async fn update_settings() -> impl IntoResponse {
 }
 
 pub async fn get_browsers() -> impl IntoResponse {
-    Json(json!([]))
+    use crate::browser::detection::BrowserDetector;
+
+    let browsers = BrowserDetector::detect_all();
+    let dtos: Vec<serde_json::Value> = browsers
+        .iter()
+        .map(|b| {
+            let id = match b.browser_type {
+                crate::browser::detection::BrowserType::Chrome => "chrome",
+                crate::browser::detection::BrowserType::Edge => "edge",
+                crate::browser::detection::BrowserType::Brave => "brave",
+                crate::browser::detection::BrowserType::Arc => "arc",
+                crate::browser::detection::BrowserType::Firefox => "firefox",
+                crate::browser::detection::BrowserType::Chromium => "chromium",
+            };
+            json!({
+                "id": id,
+                "name": b.browser_type.display_name(),
+                "profiles": b.profiles.iter().map(|p| {
+                    json!({
+                        "id": p.name,
+                        "name": p.name,
+                        "isDefault": p.is_default,
+                    })
+                }).collect::<Vec<_>>()
+            })
+        })
+        .collect();
+
+    (StatusCode::OK, Json(dtos))
 }
 
-pub async fn import_cookies() -> impl IntoResponse {
-    Json(json!({ "status": "imported" }))
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportCookiesRequest {
+    pub browser_id: String,
+    pub profile_id: String,
+    pub provider_id: String,
 }
+
+pub async fn import_cookies(Json(req): Json<ImportCookiesRequest>) -> impl IntoResponse {
+    let browser_type = match req.browser_id.as_str() {
+        "chrome" => crate::browser::detection::BrowserType::Chrome,
+        "edge" => crate::browser::detection::BrowserType::Edge,
+        "brave" => crate::browser::detection::BrowserType::Brave,
+        "arc" => crate::browser::detection::BrowserType::Arc,
+        "firefox" => crate::browser::detection::BrowserType::Firefox,
+        "chromium" => crate::browser::detection::BrowserType::Chromium,
+        _ => return (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid browser ID" }))).into_response(),
+    };
+
+    let Some(detected_browser) = crate::browser::detection::BrowserDetector::detect(browser_type) else {
+        return (StatusCode::NOT_FOUND, Json(json!({ "error": "Browser not found or not installed" }))).into_response();
+    };
+
+    let Some(_profile) = detected_browser.profiles.iter().find(|p| p.name == req.profile_id) else {
+        return (StatusCode::NOT_FOUND, Json(json!({ "error": "Profile not found" }))).into_response();
+    };
+
+    let Some(provider_id) = ProviderId::from_cli_name(&req.provider_id) else {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid provider ID" }))).into_response();
+    };
+
+    let Some(domain) = provider_id.cookie_domain() else {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "Provider does not support cookie authentication" }))).into_response();
+    };
+
+    match crate::browser::cookies::CookieExtractor::extract_for_domain(&detected_browser, domain) {
+        Ok(cookies) => {
+            if cookies.is_empty() {
+                return (StatusCode::NOT_FOUND, Json(json!({ "error": format!("No cookies found for domain {}", domain) }))).into_response();
+            }
+            let cookie_header = crate::browser::cookies::CookieExtractor::build_cookie_header(&cookies);
+
+            let mut manual_cookies = ManualCookies::load();
+            manual_cookies.set(provider_id.cli_name(), &cookie_header);
+            if let Err(e) = manual_cookies.save() {
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to save cookies: {}", e) }))).into_response();
+            }
+
+            (StatusCode::OK, Json(json!({ "status": "imported", "message": format!("Successfully imported cookies for {}", provider_id.display_name()) }))).into_response()
+        }
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))).into_response()
+        }
+    }
+}
+
