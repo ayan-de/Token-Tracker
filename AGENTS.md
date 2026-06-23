@@ -104,6 +104,7 @@ Mobile UI (future)         ──HTTP──▶  Rust Backend (localhost)
 - `src/lib/tauri.ts` — REMOVED after migration
 
 See `docs/superpowers/plans/2026-06-23-backend-migration-self-contained.md` for the full migration plan.
+See `docs/superpowers/plans/2026-06-23-feature-roadmap.md` for the full feature vision (global hotkey, floating bar, notifications, persisted settings, login flows, multi-account, and more).
 
 ### API Endpoints (target)
 

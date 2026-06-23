@@ -307,4 +307,10 @@ The HTTP API design enables a future React Native or Flutter mobile app with min
 - Same `GET/POST /api/v1/*` calls from mobile
 - Same TypeScript types from `src/lib/types.ts` (if RN)
 - Mobile app provides its own UI (not the popover design — likely a scrollable provider list)
+
+---
+
+## Related Documents
+
+- `2026-06-23-feature-roadmap.md` — Full feature vision beyond backend: global hotkey, floating overlay bar, threshold notifications, persisted settings, real login flows, multi-account switching, browser cookie import, and more.
 - No backend changes needed for mobile UI
