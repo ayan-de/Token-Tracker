@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  getCliStatus,
-  getUsageData,
-  getCostData,
+  getProviders,
+  getCost,
   triggerRefresh,
-} from "@/lib/tauri";
-import { onDataSynced, onSyncError } from "@/lib/tauriEvents";
+  getHealth,
+} from "@/lib/apiClient";
 import { mapCLIUsage, mapCLICost } from "@/lib/dataMapping";
 import type { CliStatus, ProviderUsage, CostItem } from "@/lib/types";
 
@@ -17,9 +16,6 @@ interface UseCodexBarReturn {
   cliStatus: CliStatus;
   error: string | null;
   isRefreshing: boolean;
-  isInstalling: boolean;
-  setIsInstalling: (v: boolean) => void;
-  setError: (e: string | null) => void;
   refreshData: () => Promise<void>;
 }
 
@@ -29,51 +25,53 @@ export function useCodexBar(): UseCodexBarReturn {
   const [cliStatus, setCliStatus] = useState<CliStatus>({ status: "connecting" });
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isInstalling, setIsInstalling] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const syncData = useCallback(async () => {
     try {
-      const status = await getCliStatus();
-      setCliStatus(status);
-
-      if (status.status === "available") {
+      const health = await getHealth();
+      if (health.status === "healthy") {
+        setCliStatus({ status: "available" });
         try {
-          const rawUsage = await getUsageData();
-          const rawCost = await getCostData();
+          const rawUsage = await getProviders();
+          const rawCost = await getCost();
           const usage = rawUsage.map(mapCLIUsage).filter((p): p is ProviderUsage => p !== null);
           const costs = rawCost.map(mapCLICost).filter((c) => c !== null);
           setProviders(usage);
           setCostData(costs);
           setError(null);
         } catch (err) {
-          console.warn("Loading cached CLI data failed", err);
+          console.warn("Loading cached data failed", err);
           setError(`Failed to load cached data: ${err}`);
         }
+      } else {
+        setCliStatus({ status: "error" });
       }
     } catch (err) {
       console.error("Sync error:", err);
-      setError(`Tauri backend sync error: ${err}`);
+      setCliStatus({ status: "error" });
+      setError(`Backend sync error: ${err}`);
     }
   }, []);
 
   const refreshData = useCallback(async () => {
     if (isRefreshing) return;
 
-    try {
-      const status = await getCliStatus();
-      if (status.status !== "available") return;
-    } catch {
-      return;
-    }
-
     setIsRefreshing(true);
     try {
-      await triggerRefresh();
+      const payload = await triggerRefresh();
+      const rawUsage = payload.usage ?? [];
+      const rawCost = payload.cost ?? [];
+      const usage = rawUsage.map(mapCLIUsage).filter((p): p is ProviderUsage => p !== null);
+      const costs = rawCost.map(mapCLICost).filter((c) => c !== null);
+      setProviders(usage);
+      setCostData(costs);
+      setError(null);
     } catch (err) {
-      console.error("Failed to trigger background refresh:", err);
+      console.error("Failed to trigger refresh:", err);
       setError(`Failed to trigger refresh: ${err}`);
+    } finally {
       setIsRefreshing(false);
     }
   }, [isRefreshing]);
@@ -83,36 +81,11 @@ export function useCodexBar(): UseCodexBarReturn {
       refreshData();
     });
 
-    let unlistenSynced: (() => void) | undefined;
-    let unlistenError: (() => void) | undefined;
-
-    onDataSynced((payload) => {
-      const rawUsage = payload.usage ?? [];
-      const rawCost = payload.cost ?? [];
-      const usage = rawUsage.map(mapCLIUsage).filter((p): p is ProviderUsage => p !== null);
-      const costs = rawCost.map(mapCLICost).filter((c) => c !== null);
-      setProviders(usage);
-      setCostData(costs);
-      setError(null);
-      setIsRefreshing(false);
-    }).then((fn) => {
-      unlistenSynced = fn;
-    });
-
-    onSyncError((errMsg) => {
-      setError(`Failed to sync from CLI: ${errMsg}`);
-      setIsRefreshing(false);
-    }).then((fn) => {
-      unlistenError = fn;
-    });
-
     pollingRef.current = setInterval(() => {
       refreshData();
     }, 60000);
 
     return () => {
-      unlistenSynced?.();
-      unlistenError?.();
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [syncData, refreshData]);
@@ -123,9 +96,6 @@ export function useCodexBar(): UseCodexBarReturn {
     cliStatus,
     error,
     isRefreshing,
-    isInstalling,
-    setIsInstalling,
-    setError,
     refreshData,
   };
 }
