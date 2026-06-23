@@ -737,15 +737,87 @@ pub async fn get_cost() -> impl IntoResponse {
 pub async fn get_credentials() -> impl IntoResponse {
     let api_keys = ApiKeys::load();
     let display_keys = api_keys.get_all_for_display();
-    (StatusCode::OK, Json(json!(display_keys)))
+    
+    let cookies = ManualCookies::load();
+    let display_cookies = cookies.get_all_for_display();
+    
+    let mut unified = Vec::new();
+    for key in display_keys {
+        unified.push(json!({
+            "providerId": key.provider_id,
+            "provider": key.provider,
+            "type": "key",
+            "maskedSecret": key.masked_key,
+            "savedAt": key.saved_at,
+        }));
+    }
+    for cookie in display_cookies {
+        unified.push(json!({
+            "providerId": cookie.provider_id,
+            "provider": cookie.provider,
+            "type": "cookie",
+            "maskedSecret": "Cookie Configured",
+            "savedAt": cookie.saved_at,
+        }));
+    }
+    
+    (StatusCode::OK, Json(unified))
 }
 
-pub async fn store_credential() -> impl IntoResponse {
-    Json(json!({ "status": "stored" }))
+#[derive(serde::Deserialize)]
+pub struct StoreCredentialRequest {
+    pub provider: String,
+    pub secret: String,
+    #[serde(rename = "type")]
+    pub cred_type: String, // "key" or "cookie"
 }
 
-pub async fn delete_credential() -> impl IntoResponse {
-    Json(json!({ "status": "deleted" }))
+pub async fn store_credential(Json(req): Json<StoreCredentialRequest>) -> impl IntoResponse {
+    if req.cred_type == "key" {
+        let mut api_keys = ApiKeys::load();
+        api_keys.set(&req.provider, &req.secret, None);
+        if let Err(e) = api_keys.save() {
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to save API key: {}", e) }))).into_response();
+        }
+    } else if req.cred_type == "cookie" {
+        let mut cookies = ManualCookies::load();
+        cookies.set(&req.provider, &req.secret);
+        if let Err(e) = cookies.save() {
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to save cookies: {}", e) }))).into_response();
+        }
+    } else {
+        return (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid credential type" }))).into_response();
+    }
+    
+    (StatusCode::OK, Json(json!({ "status": "stored" }))).into_response()
+}
+
+pub async fn delete_credential(axum::extract::Path(provider): axum::extract::Path<String>) -> impl IntoResponse {
+    let mut api_keys = ApiKeys::load();
+    let mut cookies = ManualCookies::load();
+    
+    let had_key = api_keys.has_key(&provider);
+    let had_cookie = cookies.get(&provider).is_some();
+    
+    if had_key {
+        api_keys.remove(&provider);
+        if let Err(e) = api_keys.save() {
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to delete API key: {}", e) }))).into_response();
+        }
+    }
+    
+    if had_cookie {
+        cookies.remove(&provider);
+        if let Err(e) = cookies.save() {
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to delete cookies: {}", e) }))).into_response();
+        }
+    }
+    
+    if !had_key && !had_cookie {
+        return (StatusCode::NOT_FOUND, Json(json!({ "error": format!("No credentials found for provider {}", provider) }))).into_response();
+    }
+    
+    (StatusCode::OK, Json(json!({ "status": "deleted" }))).into_response()
 }
 
 pub async fn get_settings() -> impl IntoResponse {
@@ -753,8 +825,12 @@ pub async fn get_settings() -> impl IntoResponse {
     (StatusCode::OK, Json(settings))
 }
 
-pub async fn update_settings() -> impl IntoResponse {
-    Json(json!({ "status": "updated" }))
+pub async fn update_settings(Json(new_settings): Json<Settings>) -> impl IntoResponse {
+    if let Err(e) = new_settings.save() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to save settings: {}", e) }))).into_response();
+    }
+    
+    (StatusCode::OK, Json(json!({ "status": "updated" }))).into_response()
 }
 
 pub async fn get_browsers() -> impl IntoResponse {
