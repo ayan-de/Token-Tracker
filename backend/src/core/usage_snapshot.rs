@@ -7,6 +7,7 @@ use super::RateWindow;
 
 /// A labeled extra usage window surfaced by provider APIs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NamedRateWindow {
     pub id: String,
     pub title: String,
@@ -25,6 +26,7 @@ impl NamedRateWindow {
 
 /// A snapshot of usage data for a provider at a point in time
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UsageSnapshot {
     /// Primary rate window (usually session-based, e.g., 5-hour for Claude)
     pub primary: RateWindow,
@@ -174,6 +176,7 @@ impl UsageSnapshot {
 
 /// Cost/credits snapshot for providers that support it
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CostSnapshot {
     /// Amount used in the current period
     pub used: f64,

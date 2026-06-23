@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Represents a rate limit window with usage percentage and reset time
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RateWindow {
     /// Percentage of the window that has been used (0-100)
     pub used_percent: f64,
