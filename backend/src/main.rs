@@ -7,6 +7,9 @@ pub mod secure_file;
 pub mod wsl;
 pub mod browser;
 pub mod server;
+pub mod sound;
+pub mod notifications;
+
 
 
 use std::net::SocketAddr;

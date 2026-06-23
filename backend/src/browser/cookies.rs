@@ -15,7 +15,7 @@ use base64::Engine;
 use rusqlite::Connection;
 use thiserror::Error;
 
-use super::detection::{BrowserProfile, DetectedBrowser};
+use super::detection::{BrowserProfile, DetectedBrowser, BrowserType};
 
 /// Errors that can occur during cookie extraction
 #[derive(Debug, Error)]
@@ -179,7 +179,7 @@ impl CookieExtractor {
 
         // Get the encryption key from Local State
         let local_state_path = profile.local_state_path(&browser.user_data_dir);
-        let encryption_key = Self::get_chromium_encryption_key(&local_state_path).map_err(|e| {
+        let encryption_key = Self::get_chromium_encryption_key(&browser.browser_type, &local_state_path).map_err(|e| {
             tracing::debug!("Failed to get encryption key: {}", e);
             e
         })?;
@@ -288,8 +288,51 @@ impl CookieExtractor {
         Ok(cookies)
     }
 
-    /// Get the Chromium encryption key from Local State
-    fn get_chromium_encryption_key(local_state_path: &Path) -> Result<Vec<u8>, CookieError> {
+    /// Get the Chromium encryption key from Local State (Windows/WSL) or Gnome Keyring (Linux)
+    fn get_chromium_encryption_key(
+        browser_type: &BrowserType,
+        local_state_path: &Path,
+    ) -> Result<Vec<u8>, CookieError> {
+        #[cfg(target_os = "linux")]
+        {
+            if !crate::wsl::is_wsl() {
+                let app_name = match browser_type {
+                    BrowserType::Chrome => "chrome",
+                    BrowserType::Chromium => "chromium",
+                    BrowserType::Brave => "brave",
+                    BrowserType::Edge => "edge",
+                    _ => "chrome",
+                };
+
+                let output = std::process::Command::new("secret-tool")
+                    .args(&[
+                        "lookup",
+                        "xdg:schema",
+                        "chrome_libsecret_os_crypt_password_v2",
+                        "application",
+                        app_name,
+                    ])
+                    .output();
+
+                let secret = match output {
+                    Ok(out) if out.status.success() => {
+                        String::from_utf8_lossy(&out.stdout).trim().to_string()
+                    }
+                    _ => {
+                        tracing::debug!("secret-tool lookup failed; falling back to peanuts");
+                        "peanuts".to_string()
+                    }
+                };
+
+                use pbkdf2::pbkdf2_hmac;
+                use sha1::Sha1;
+
+                let mut key = vec![0u8; 16];
+                pbkdf2_hmac::<Sha1>(secret.as_bytes(), b"saltysalt", 1, &mut key);
+                return Ok(key);
+            }
+        }
+
         let content = Self::read_file_shared(local_state_path)?;
         let json: serde_json::Value =
             serde_json::from_str(&content).map_err(|e| CookieError::Decryption(e.to_string()))?;
@@ -380,6 +423,51 @@ impl CookieExtractor {
     fn decrypt_chromium_cookie(encrypted_value: &[u8], key: &[u8]) -> Result<String, CookieError> {
         if encrypted_value.is_empty() {
             return Ok(String::new());
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            if !crate::wsl::is_wsl() {
+                let has_v10_prefix = encrypted_value.len() >= 3 && &encrypted_value[0..3] == b"v10";
+                let has_v11_prefix = encrypted_value.len() >= 3 && &encrypted_value[0..3] == b"v11";
+
+                if has_v10_prefix || has_v11_prefix {
+                    let ciphertext = &encrypted_value[3..];
+                    let iv = b"                "; // 16 spaces
+
+                    use aes::Aes128;
+                    use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
+                    use cbc::Decryptor;
+
+                    type Aes128CbcDec = Decryptor<Aes128>;
+
+                    let decryptor = Aes128CbcDec::new_from_slices(key, iv)
+                        .map_err(|e| CookieError::Decryption(format!("Cipher init: {}", e)))?;
+
+                    let mut buffer = ciphertext.to_vec();
+                    let decrypted = decryptor
+                        .decrypt_padded_mut::<Pkcs7>(&mut buffer)
+                        .map_err(|e| CookieError::Decryption(format!("AES-CBC decrypt: {}", e)))?;
+
+                    // Strip 32-byte header if present
+                    let value_bytes = if decrypted.len() > 32 {
+                        let has_garbage = decrypted[..32].iter().any(|&b| !(32..=127).contains(&b));
+                        if has_garbage {
+                            &decrypted[32..]
+                        } else {
+                            &decrypted[..]
+                        }
+                    } else {
+                        &decrypted[..]
+                    };
+
+                    return String::from_utf8(value_bytes.to_vec())
+                        .map_err(|e| CookieError::Decryption(e.to_string()));
+                } else {
+                    return String::from_utf8(encrypted_value.to_vec())
+                        .map_err(|e| CookieError::Decryption(e.to_string()));
+                }
+            }
         }
 
         // Check for v10/v11 prefix (AES-256-GCM)
