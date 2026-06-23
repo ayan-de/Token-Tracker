@@ -179,7 +179,8 @@ impl AntigravityProvider {
                     .and_then(|c| c.get(1))
                     .and_then(|m| m.as_str().parse::<u16>().ok());
 
-                if let (Some(token), Some(p)) = (csrf_token, port) {
+                if let Some(token) = csrf_token {
+                    let p = port.unwrap_or(0);
                     return Ok(ProcessInfo {
                         csrf_token: token,
                         extension_server_csrf_token: ext_csrf_token,
@@ -299,11 +300,69 @@ impl AntigravityProvider {
         ports
     }
 
-    /// Non-Windows platforms have no `Get-NetTCPConnection`; return an empty list by design so
-    /// the caller falls back to the heuristic candidate ports.
+    /// Non-Windows platforms scan the /proc filesystem (on Linux) to associate the process's
+    /// socket file descriptors with local listening ports from /proc/net/tcp.
     #[cfg(not(windows))]
-    fn listening_ports_for_pid(_pid: u32) -> Vec<u16> {
-        Vec::new()
+    fn listening_ports_for_pid(pid: u32) -> Vec<u16> {
+        let mut inodes = std::collections::HashSet::new();
+
+        // 1. Read /proc/<pid>/fd/ to get socket inodes
+        let fd_path = format!("/proc/{}/fd", pid);
+        if let Ok(fd_entries) = std::fs::read_dir(&fd_path) {
+            for entry in fd_entries.flatten() {
+                if let Ok(target) = std::fs::read_link(entry.path()) {
+                    let target_str = target.to_string_lossy();
+                    if target_str.starts_with("socket:[") && target_str.ends_with(']') {
+                        let inode_str = &target_str[8..target_str.len() - 1];
+                        if let Ok(inode) = inode_str.parse::<u64>() {
+                            inodes.insert(inode);
+                        }
+                    }
+                }
+            }
+        }
+
+        if inodes.is_empty() {
+            return Vec::new();
+        }
+
+        let mut ports = Vec::new();
+
+        // 2. Read /proc/net/tcp and /proc/net/tcp6 to find matching ports
+        let net_files = ["/proc/net/tcp", "/proc/net/tcp6"];
+        for net_file in net_files {
+            if let Ok(content) = std::fs::read_to_string(net_file) {
+                // First line is header
+                for line in content.lines().skip(1) {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() < 10 {
+                        continue;
+                    }
+
+                    // st (state) field is parts[3]. "0A" is TCP_LISTEN
+                    if parts[3] != "0A" {
+                        continue;
+                    }
+
+                    let Ok(inode) = parts[9].parse::<u64>() else {
+                        continue;
+                    };
+
+                    if inodes.contains(&inode) {
+                        let local_address = parts[1];
+                        if let Some((_ip_hex, port_hex)) = local_address.split_once(':') {
+                            if let Ok(port) = u16::from_str_radix(port_hex, 16) {
+                                ports.push(port);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        ports.sort_unstable();
+        ports.dedup();
+        ports
     }
 
     /// Fetch user status from Antigravity API
