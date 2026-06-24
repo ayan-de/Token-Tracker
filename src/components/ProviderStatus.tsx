@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { ProviderUsage } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 import LoginMethodBadge from "@/components/LoginMethodBadge";
@@ -23,7 +24,7 @@ function formatRelativeTime(sec: number | null | undefined): string {
   return `Updated on ${new Date(sec * 1000).toLocaleDateString()}`;
 }
 
-export default function ProviderStatus({
+export default memo(function ProviderStatus({
   provider: p,
   theme,
   onOpenAddAccountModal,
@@ -68,4 +69,4 @@ export default function ProviderStatus({
       )}
     </div>
   );
-}
+});

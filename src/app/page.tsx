@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useCodexBar } from "@/hooks/useCodexBar";
 import ErrorBanner from "@/components/ErrorBanner";
 import ProviderDetail from "@/components/ProviderDetail";
@@ -75,18 +75,60 @@ export default function HomePage() {
     }
   }, [providers, selectedProvider]);
 
+  // Memoize filtered providers to avoid recomputation on every render
+  const enabledProviders = useMemo(() =>
+    providers.filter(p => settings?.enabled_providers?.includes(p.provider)),
+    [providers, settings?.enabled_providers]
+  );
+
   // Auto-select first enabled provider if current selection is disabled
   useEffect(() => {
-    const enabledProviders = providers.filter(p => settings?.enabled_providers?.includes(p.provider));
     if (enabledProviders.length > 0 && selectedProvider && !enabledProviders.some(p => p.provider === selectedProvider)) {
       setSelectedProvider(enabledProviders[0].provider);
     }
-  }, [settings?.enabled_providers, providers, selectedProvider]);
+  }, [enabledProviders, selectedProvider]);
 
-  const activeProviderObj = providers.find((p) => p.provider === selectedProvider);
-  const activeCostItem = costData.find(
-    (c) => c.provider.toLowerCase() === selectedProvider?.toLowerCase()
+  // Memoize active provider lookup
+  const activeProviderObj = useMemo(() =>
+    providers.find((p) => p.provider === selectedProvider) ?? null,
+    [providers, selectedProvider]
   );
+
+  // Memoize active cost item lookup
+  const activeCostItem = useMemo(() =>
+    costData.find((c) => c.provider.toLowerCase() === selectedProvider?.toLowerCase()) ?? undefined,
+    [costData, selectedProvider]
+  );
+
+  // Stable callback for provider selection
+  const handleSelectProvider = useCallback((provider: string) => {
+    setSelectedProvider(provider);
+  }, []);
+
+  // Stable callbacks for modal handlers
+  const handleOpenAddAccountModal = useCallback((prov: string) => {
+    setAddAccountProvider(prov);
+  }, []);
+
+  const handleOpenSettingsModal = useCallback(() => {
+    setSettingsOpen(true);
+  }, []);
+
+  const handleOpenAboutModal = useCallback(() => {
+    setAboutOpen(true);
+  }, []);
+
+  const handleCloseAddAccountModal = useCallback(() => {
+    setAddAccountProvider(null);
+  }, []);
+
+  const handleCloseSettingsModal = useCallback(() => {
+    setSettingsOpen(false);
+  }, []);
+
+  const handleCloseAboutModal = useCallback(() => {
+    setAboutOpen(false);
+  }, []);
 
   return (
     <div className="relative flex flex-col h-screen w-screen bg-primary text-text-main overflow-hidden font-outfit select-none">
@@ -118,9 +160,9 @@ export default function HomePage() {
           <>
             {/* Horizontal Tabs Switcher */}
             <ProviderTabBar
-              providers={providers.filter(p => settings?.enabled_providers?.includes(p.provider))}
+              providers={enabledProviders}
               selectedProvider={selectedProvider}
-              onSelectProvider={setSelectedProvider}
+              onSelectProvider={handleSelectProvider}
               theme={theme}
             />
 
@@ -130,9 +172,9 @@ export default function HomePage() {
                 provider={activeProviderObj}
                 costItem={activeCostItem}
                 theme={theme}
-                onOpenAddAccountModal={(prov) => setAddAccountProvider(prov)}
-                onOpenSettingsModal={() => setSettingsOpen(true)}
-                onOpenAboutModal={() => setAboutOpen(true)}
+                onOpenAddAccountModal={handleOpenAddAccountModal}
+                onOpenSettingsModal={handleOpenSettingsModal}
+                onOpenAboutModal={handleOpenAboutModal}
               />
             )}
           </>
@@ -145,7 +187,7 @@ export default function HomePage() {
       {addAccountProvider && (
         <AddAccountModal
           provider={addAccountProvider}
-          onClose={() => setAddAccountProvider(null)}
+          onClose={handleCloseAddAccountModal}
         />
       )}
 
@@ -157,7 +199,7 @@ export default function HomePage() {
           browsers={browsers}
           installedProviders={installedProviders}
           theme={theme}
-          onClose={() => setSettingsOpen(false)}
+          onClose={handleCloseSettingsModal}
           onUpdateSettings={updateAppSettings}
           onAddCredential={addCredential}
           onRemoveCredential={removeCredential}
@@ -169,7 +211,7 @@ export default function HomePage() {
       {/* About Modal */}
       {aboutOpen && (
         <AboutModal
-          onClose={() => setAboutOpen(false)}
+          onClose={handleCloseAboutModal}
         />
       )}
 

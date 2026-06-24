@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import { Sun, Moon, RefreshCw } from "@/lib/icons";
 import type { CliStatus } from "@/lib/types";
 
@@ -11,7 +12,7 @@ interface ProviderHeaderProps {
   onRefresh: () => void;
 }
 
-export default function ProviderHeader({
+export default memo(function ProviderHeader({
   cliStatus,
   isRefreshing,
   theme,
@@ -60,4 +61,4 @@ export default function ProviderHeader({
       </div>
     </div>
   );
-}
+});

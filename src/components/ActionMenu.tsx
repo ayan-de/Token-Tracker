@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { ProviderUsage } from "@/lib/types";
 import { invoke } from "@tauri-apps/api/core";
 import { Key, BarChart3, Heart, Settings, Info, LogOut } from "@/lib/icons";
@@ -24,7 +25,7 @@ interface ActionMenuProps {
   onOpenAboutModal: () => void;
 }
 
-export default function ActionMenu({
+export default memo(function ActionMenu({
   provider: p,
   onOpenAddAccountModal,
   onOpenSettingsModal,
@@ -110,4 +111,4 @@ export default function ActionMenu({
       </button>
     </div>
   );
-}
+});

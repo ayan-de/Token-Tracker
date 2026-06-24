@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -31,7 +32,7 @@ interface LimitLineGraphProps {
   provider: ProviderUsage;
 }
 
-export default function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
+function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
   const desc = PROVIDER_DESCRIPTORS[p.provider.toLowerCase()] || {
     displayName: p.provider_label,
     sessionLabel: "Session",
@@ -105,8 +106,7 @@ export default function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
     responsive: true,
     maintainAspectRatio: false,
     animation: {
-      duration: 600,
-      easing: "easeOutQuart",
+      duration: 0, // Disable animation on re-renders for performance
     },
     plugins: {
       legend: {
@@ -161,6 +161,8 @@ export default function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
     </div>
   );
 }
+
+export default memo(LimitLineGraph);
 
 function getGradientColor(provider: string, index: number, alpha: number = 1): string {
   const colors: Record<number, string> = {

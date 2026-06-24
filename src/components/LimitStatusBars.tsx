@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, memo } from "react";
 import type { ProviderUsage } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS } from "@/lib/dataMapping";
 import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
@@ -10,7 +10,7 @@ interface LimitStatusBarsProps {
   onOpenAddAccountModal: (provider: string) => void;
 }
 
-export default function LimitStatusBars({ provider: p, onOpenAddAccountModal }: LimitStatusBarsProps) {
+export default memo(function LimitStatusBars({ provider: p, onOpenAddAccountModal }: LimitStatusBarsProps) {
   const desc = PROVIDER_DESCRIPTORS[p.provider.toLowerCase()] || {
     displayName: p.provider_label,
     sessionLabel: "Session",
@@ -154,4 +154,4 @@ export default function LimitStatusBars({ provider: p, onOpenAddAccountModal }: 
       )}
     </div>
   );
-}
+});

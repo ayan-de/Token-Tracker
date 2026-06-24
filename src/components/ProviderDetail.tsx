@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { ProviderUsage, CostItem } from "@/lib/types";
 import ProviderStatus from "./ProviderStatus";
 import LimitStatusBars from "./LimitStatusBars";
@@ -16,7 +17,7 @@ interface ProviderDetailProps {
   onOpenAboutModal: () => void;
 }
 
-export default function ProviderDetail({
+export default memo(function ProviderDetail({
   provider,
   costItem,
   theme,
@@ -52,4 +53,4 @@ export default function ProviderDetail({
       />
     </div>
   );
-}
+});
