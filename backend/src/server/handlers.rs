@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use serde_json::json;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::fs::File;
@@ -16,6 +16,7 @@ use crate::core::{
     instantiate_provider, FetchContext, ProviderId,
 };
 use crate::settings::{Settings, ApiKeys, ManualCookies};
+use crate::providers::minimax::MiniMaxProvider;
 
 // --- Cache Helpers ---
 
@@ -149,12 +150,18 @@ fn filter_usage_to_installed(
     let Some(items) = usage.as_array() else {
         return usage;
     };
+    // Also include providers that have saved credentials, even without CLI or cached data
+    let api_keys = ApiKeys::load();
+    let manual_cookies = ManualCookies::load();
     serde_json::Value::Array(
         items
             .iter()
             .filter(|item| {
                 let (provider, _) = usage_item_key(item);
-                installed_providers.contains(&provider) || has_usage_data(item)
+                installed_providers.contains(&provider)
+                    || has_usage_data(item)
+                    || api_keys.has_key(&provider)
+                    || manual_cookies.get(&provider).is_some()
             })
             .cloned()
             .collect(),
@@ -796,14 +803,28 @@ pub struct StoreCredentialRequest {
     pub secret: String,
     #[serde(rename = "type")]
     pub cred_type: String, // "key" or "cookie"
+    /// Extra credential fields for providers that need multiple values (e.g., MiniMax group_id)
+    #[serde(default)]
+    pub fields: HashMap<String, String>,
 }
 
 pub async fn store_credential(Json(req): Json<StoreCredentialRequest>) -> impl IntoResponse {
     if req.cred_type == "key" {
         let mut api_keys = ApiKeys::load();
-        api_keys.set(&req.provider, &req.secret, None);
+        if req.fields.is_empty() {
+            api_keys.set(&req.provider, &req.secret, None);
+        } else {
+            api_keys.set_with_extra(&req.provider, &req.secret, req.fields.clone(), None);
+        }
         if let Err(e) = api_keys.save() {
             return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to save API key: {}", e) }))).into_response();
+        }
+        // Also save to provider's native config file so CLI tools can use the same credentials
+        if req.provider == "minimax" {
+            let group_id = req.fields.get("group_id").cloned().unwrap_or_default();
+            if let Err(e) = MiniMaxProvider::save_config(&req.secret, &group_id) {
+                tracing::warn!("Failed to save MiniMax native config: {}", e);
+            }
         }
     } else if req.cred_type == "cookie" {
         let mut cookies = ManualCookies::load();
@@ -814,7 +835,7 @@ pub async fn store_credential(Json(req): Json<StoreCredentialRequest>) -> impl I
     } else {
         return (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid credential type" }))).into_response();
     }
-    
+
     (StatusCode::OK, Json(json!({ "status": "stored" }))).into_response()
 }
 
