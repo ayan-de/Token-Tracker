@@ -66,10 +66,10 @@ export async function getCredentials(): Promise<any[]> {
   return request<any[]>("/api/v1/credentials");
 }
 
-export async function storeCredential(provider: string, secret: string, type: "key" | "cookie"): Promise<any> {
+export async function storeCredential(provider: string, secret: string, type: "key" | "cookie", fields?: Record<string, string>): Promise<any> {
   return request<any>("/api/v1/credentials", {
     method: "POST",
-    body: JSON.stringify({ provider, secret, type }),
+    body: JSON.stringify({ provider, secret, type, fields: fields ?? {} }),
   });
 }
 

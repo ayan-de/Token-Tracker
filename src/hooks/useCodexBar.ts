@@ -138,17 +138,19 @@ export function useCodexBar(): UseCodexBarReturn {
     }
   }, []);
 
-  const addCredential = useCallback(async (provider: string, secret: string, type: "key" | "cookie") => {
+  const addCredential = useCallback(async (provider: string, secret: string, type: "key" | "cookie", fields?: Record<string, string>) => {
     try {
-      await storeCredential(provider, secret, type);
+      await storeCredential(provider, secret, type, fields);
       await refetchCredentials();
+      // Refresh to fetch the newly-added provider's data
+      await refreshData();
       return true;
     } catch (err) {
       console.error("Failed to add credential:", err);
       setError(`Failed to add credential: ${err}`);
       return false;
     }
-  }, [refetchCredentials]);
+  }, [refetchCredentials, refreshData]);
 
   const removeCredential = useCallback(async (provider: string) => {
     try {
