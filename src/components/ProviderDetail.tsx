@@ -7,35 +7,29 @@ import LimitStatusBars from "./LimitStatusBars";
 import LimitLineGraph from "./LimitLineGraph";
 import CreditsCost from "./CreditsCost";
 import ActionMenu from "./ActionMenu";
+import { useModals } from "@/app/page";
 
 interface ProviderDetailProps {
   provider: ProviderUsage;
   costItem?: CostItem;
-  theme: 'dark' | 'light';
-  onOpenAddAccountModal: (provider: string) => void;
-  onOpenSettingsModal: () => void;
-  onOpenAboutModal: () => void;
 }
 
 export default memo(function ProviderDetail({
   provider,
   costItem,
-  theme,
-  onOpenAddAccountModal,
-  onOpenSettingsModal,
-  onOpenAboutModal,
 }: ProviderDetailProps) {
+  const { openAddAccount, openSettings, openAbout } = useModals();
+
   return (
     <div className="flex flex-col flex-1 overflow-y-auto px-4 py-2 font-outfit">
       <ProviderStatus
         provider={provider}
-        theme={theme}
-        onOpenAddAccountModal={onOpenAddAccountModal}
+        onOpenAddAccountModal={openAddAccount}
       />
 
       <LimitStatusBars
         provider={provider}
-        onOpenAddAccountModal={onOpenAddAccountModal}
+        onOpenAddAccountModal={openAddAccount}
       />
 
       <LimitLineGraph provider={provider} />
@@ -47,9 +41,9 @@ export default memo(function ProviderDetail({
 
       <ActionMenu
         provider={provider}
-        onOpenAddAccountModal={onOpenAddAccountModal}
-        onOpenSettingsModal={onOpenSettingsModal}
-        onOpenAboutModal={onOpenAboutModal}
+        onOpenAddAccountModal={openAddAccount}
+        onOpenSettingsModal={openSettings}
+        onOpenAboutModal={openAbout}
       />
     </div>
   );

@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { PROVIDER_DESCRIPTORS, providerLogo, CredentialField } from "@/lib/dataMapping";
 import { Trash2 } from "@/lib/icons";
+import { useTheme } from "@/app/page";
 
 interface SettingsModalProps {
   settings: any | null;
   credentials: any[];
   browsers: any[];
   installedProviders: string[];
-  theme: 'dark' | 'light';
   onClose: () => void;
   onUpdateSettings: (newSettings: any) => Promise<boolean>;
   onAddCredential: (provider: string, secret: string, type: "key" | "cookie", fields?: Record<string, string>) => Promise<boolean>;
@@ -23,7 +23,6 @@ export default function SettingsModal({
   credentials,
   browsers,
   installedProviders,
-  theme,
   onClose,
   onUpdateSettings,
   onAddCredential,
@@ -31,6 +30,7 @@ export default function SettingsModal({
   onImportCookies,
   onRefetchBrowsers,
 }: SettingsModalProps) {
+  const { theme } = useTheme();
   const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'providers' | 'credentials' | 'import'>('general');
   const [credProvider, setCredProvider] = useState<string>("claude");
   const [credType, setCredType] = useState<'key' | 'cookie'>('key');

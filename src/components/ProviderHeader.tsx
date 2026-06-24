@@ -1,24 +1,23 @@
 "use client";
 
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import { Sun, Moon, RefreshCw } from "@/lib/icons";
+import { useTheme } from "@/app/page";
 import type { CliStatus } from "@/lib/types";
 
 interface ProviderHeaderProps {
   cliStatus: CliStatus;
   isRefreshing: boolean;
-  theme: 'dark' | 'light';
-  onToggleTheme: () => void;
   onRefresh: () => void;
 }
 
 export default memo(function ProviderHeader({
   cliStatus,
   isRefreshing,
-  theme,
-  onToggleTheme,
   onRefresh,
 }: ProviderHeaderProps) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-border-subtle bg-secondary/20 backdrop-blur-sm">
       <div className="flex items-center gap-2">
@@ -36,7 +35,7 @@ export default memo(function ProviderHeader({
       <div className="flex items-center gap-1.5">
         {/* Theme Mode Toggle Button */}
         <button
-          onClick={onToggleTheme}
+          onClick={toggleTheme}
           className="p-1 rounded-lg bg-bg-subtle hover:bg-hover-subtle text-text-muted hover:text-text-main transition-all cursor-pointer border-0 outline-none focus:outline-none focus:bg-bg-subtle focus:text-text-main"
           title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >

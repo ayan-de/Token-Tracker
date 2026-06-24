@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -43,75 +43,69 @@ function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
   const u = p.usage;
   if (!u) return null;
 
-  // Build labels and data for each rate window
-  const labels: string[] = [];
-  const datasets: any[] = [];
+  // Memoize chart data to prevent recreating on every render
+  const chartData = useMemo(() => {
+    const labels: string[] = [];
+    const datasets: any[] = [];
 
-  // Primary window (Session)
-  if (u.primary) {
-    labels.push(desc.sessionLabel);
-    const primaryPercent = u.primary.usedPercent;
-    datasets.push({
-      label: desc.sessionLabel,
-      data: [primaryPercent],
-      borderColor: getGradientColor(p.provider, 0),
-      backgroundColor: getGradientColor(p.provider, 0, 0.1),
-      fill: true,
-      tension: 0.4,
-      pointRadius: 6,
-      pointBackgroundColor: getGradientColor(p.provider, 0),
-    });
-  }
+    if (u.primary) {
+      labels.push(desc.sessionLabel);
+      datasets.push({
+        label: desc.sessionLabel,
+        data: [u.primary.usedPercent],
+        borderColor: getGradientColor(p.provider, 0),
+        backgroundColor: getGradientColor(p.provider, 0, 0.1),
+        fill: true,
+        tension: 0.4,
+        pointRadius: 6,
+        pointBackgroundColor: getGradientColor(p.provider, 0),
+      });
+    }
 
-  // Secondary window (Weekly)
-  if (u.secondary) {
-    labels.push(desc.weeklyLabel);
-    const secondaryPercent = u.secondary.usedPercent;
-    datasets.push({
-      label: desc.weeklyLabel,
-      data: [secondaryPercent],
-      borderColor: getGradientColor(p.provider, 1),
-      backgroundColor: getGradientColor(p.provider, 1, 0.1),
-      fill: true,
-      tension: 0.4,
-      pointRadius: 6,
-      pointBackgroundColor: getGradientColor(p.provider, 1),
-    });
-  }
+    if (u.secondary) {
+      labels.push(desc.weeklyLabel);
+      datasets.push({
+        label: desc.weeklyLabel,
+        data: [u.secondary.usedPercent],
+        borderColor: getGradientColor(p.provider, 1),
+        backgroundColor: getGradientColor(p.provider, 1, 0.1),
+        fill: true,
+        tension: 0.4,
+        pointRadius: 6,
+        pointBackgroundColor: getGradientColor(p.provider, 1),
+      });
+    }
 
-  // Tertiary window (Sonnet/Opus)
-  if (u.tertiary && desc.opusLabel) {
-    labels.push(desc.opusLabel);
-    const tertiaryPercent = u.tertiary.usedPercent;
-    datasets.push({
-      label: desc.opusLabel,
-      data: [tertiaryPercent],
-      borderColor: getGradientColor(p.provider, 2),
-      backgroundColor: getGradientColor(p.provider, 2, 0.1),
-      fill: true,
-      tension: 0.4,
-      pointRadius: 6,
-      pointBackgroundColor: getGradientColor(p.provider, 2),
-    });
-  }
+    if (u.tertiary && desc.opusLabel) {
+      labels.push(desc.opusLabel);
+      datasets.push({
+        label: desc.opusLabel,
+        data: [u.tertiary.usedPercent],
+        borderColor: getGradientColor(p.provider, 2),
+        backgroundColor: getGradientColor(p.provider, 2, 0.1),
+        fill: true,
+        tension: 0.4,
+        pointRadius: 6,
+        pointBackgroundColor: getGradientColor(p.provider, 2),
+      });
+    }
 
-  if (datasets.length === 0) return null;
+    return { labels, datasets };
+  }, [u, desc, p.provider]);
 
-  const data = {
-    labels,
-    datasets,
-  };
+  if (chartData.datasets.length === 0) return null;
 
-  const options: any = {
+  // Memoize options - static config doesn't need to change
+  const options = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     animation: {
-      duration: 0, // Disable animation on re-renders for performance
+      duration: 0,
     },
     plugins: {
       legend: {
         display: true,
-        position: "bottom",
+        position: "bottom" as const,
         labels: {
           color: "#64748b",
           font: { size: 10, family: "Outfit" },
@@ -150,13 +144,16 @@ function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
         },
       },
     },
-  };
+  }), []);
 
   return (
     <div className="py-2.5 border-b border-border-subtle">
       <div className="text-xs font-semibold text-text-main mb-2">Usage Overview</div>
       <div className="h-[120px]">
-        <Line data={data} options={options} />
+        <Line
+          data={chartData}
+          options={options}
+        />
       </div>
     </div>
   );

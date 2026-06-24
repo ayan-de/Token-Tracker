@@ -5,31 +5,30 @@ import type { ProviderUsage } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 import { getProviderGradient } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "@/lib/icons";
+import { useTheme } from "@/app/page";
 
 interface ProviderTabBarProps {
   providers: ProviderUsage[];
   selectedProvider: string | null;
   onSelectProvider: (provider: string) => void;
-  theme: 'dark' | 'light';
 }
 
 const ProviderTab = memo(function ProviderTab({
   provider: p,
   isSelected,
-  theme,
   onSelect,
 }: {
   provider: ProviderUsage;
   isSelected: boolean;
-  theme: 'dark' | 'light';
   onSelect: (provider: string) => void;
 }) {
+  const { theme } = useTheme();
   const desc = PROVIDER_DESCRIPTORS[p.provider.toLowerCase()] || { displayName: p.provider_label };
 
   return (
     <button
       onClick={() => onSelect(p.provider)}
-      className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer border-0 outline-none focus:outline-none shrink-0 ${
+      className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-semibold whitespace-nowrap cursor-pointer border-0 outline-none focus:outline-none shrink-0 ${
         isSelected
           ? `text-white shadow-lg shadow-[#3b82f6]/25`
           : "bg-transparent text-text-muted hover:text-text-main hover:bg-hover-subtle"
@@ -40,7 +39,7 @@ const ProviderTab = memo(function ProviderTab({
         <img
           src={providerLogo(p.provider, theme)}
           alt=""
-          className={`w-5 h-5 object-contain transition-all ${isSelected ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
+          className={`w-5 h-5 object-contain ${isSelected ? 'opacity-100' : 'opacity-80'}`}
         />
       ) : (
         <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
@@ -51,7 +50,7 @@ const ProviderTab = memo(function ProviderTab({
       {!isSelected ? (
         <div className="w-8 h-1 bg-border-subtle/50 rounded-full overflow-hidden mt-0.5">
           <div
-            className={`h-full rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`}
+            className={`h-full rounded-full transition-all duration-500 ${getProviderGradient(p.provider)}`}
             style={{ width: `${Math.min(Math.max(p.usage?.primary?.usedPercent || 0, 0), 100)}%` }}
           />
         </div>
@@ -66,7 +65,6 @@ function ProviderTabBar({
   providers,
   selectedProvider,
   onSelectProvider,
-  theme,
 }: ProviderTabBarProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -90,11 +88,10 @@ function ProviderTabBar({
         key={p.provider}
         provider={p}
         isSelected={selectedProvider === p.provider}
-        theme={theme}
         onSelect={handleSelect}
       />
     ))
-  ), [providers, selectedProvider, theme, handleSelect]);
+  ), [providers, selectedProvider, handleSelect]);
 
   return (
     <div className="flex items-center border-b border-border-subtle bg-secondary/10">

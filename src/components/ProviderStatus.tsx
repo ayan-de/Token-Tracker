@@ -4,10 +4,10 @@ import { memo } from "react";
 import type { ProviderUsage } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 import LoginMethodBadge from "@/components/LoginMethodBadge";
+import { useTheme } from "@/app/page";
 
 interface ProviderStatusProps {
   provider: ProviderUsage;
-  theme: 'dark' | 'light';
   onOpenAddAccountModal: (provider: string) => void;
 }
 
@@ -26,9 +26,9 @@ function formatRelativeTime(sec: number | null | undefined): string {
 
 export default memo(function ProviderStatus({
   provider: p,
-  theme,
   onOpenAddAccountModal,
 }: ProviderStatusProps) {
+  const { theme } = useTheme();
   const desc = PROVIDER_DESCRIPTORS[p.provider.toLowerCase()] || {
     displayName: p.provider_label,
     sessionLabel: "Session",
