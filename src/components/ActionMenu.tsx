@@ -37,7 +37,7 @@ export default function ActionMenu({
 
   const handleOpenUrl = async (url: string) => {
     try {
-      await invoke("plugin:opener|open", { path: url });
+      await invoke("plugin:opener|open_url", { url });
     } catch (err) {
       console.error("Failed to open URL via Tauri:", err);
     }
