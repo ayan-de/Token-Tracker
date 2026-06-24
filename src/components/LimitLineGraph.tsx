@@ -55,7 +55,7 @@ function LimitLineGraph({ provider: p }: LimitLineGraphProps) {
             <span className="text-[10px] text-text-muted w-16 truncate">{bar.label}</span>
             <div className="flex-1 h-2 bg-bg-subtle rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="h-full rounded-full"
                 style={{
                   width: `${Math.min(Math.max(bar.percent, 0), 100)}%`,
                   background: `linear-gradient(90deg, ${gradientColors[bar.colorIndex].start}, ${gradientColors[bar.colorIndex].end})`,
