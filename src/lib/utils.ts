@@ -1,5 +1,6 @@
 export function formatTimeUntil(isoString: string | null): string {
   if (!isoString) return "";
+  if (isoString === "Resetting...") return "Resetting...";
   const resetsAt = new Date(isoString);
   const now = new Date();
   const diffMs = resetsAt.getTime() - now.getTime();
