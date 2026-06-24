@@ -27,7 +27,7 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
   factory:    { displayName: "Factory",    logo: "",                          sessionLabel: "Standard", weeklyLabel: "Premium" },
   copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat" },
   zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
-  minimax:   { displayName: "MiniMax",     logo: "",                          sessionLabel: "Prompts", weeklyLabel: "Window" },
+  minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   kimi:       { displayName: "Kimi",       logo: "",                          sessionLabel: "Weekly", weeklyLabel: "Rate Limit" },
   kilo:       { displayName: "Kilo",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Kilo Pass" },
   kiro:       { displayName: "Kiro",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Bonus" },
