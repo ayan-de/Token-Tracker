@@ -75,6 +75,14 @@ export default function HomePage() {
     }
   }, [providers, selectedProvider]);
 
+  // Auto-select first enabled provider if current selection is disabled
+  useEffect(() => {
+    const enabledProviders = providers.filter(p => settings?.enabled_providers?.includes(p.provider));
+    if (enabledProviders.length > 0 && selectedProvider && !enabledProviders.some(p => p.provider === selectedProvider)) {
+      setSelectedProvider(enabledProviders[0].provider);
+    }
+  }, [settings?.enabled_providers, providers, selectedProvider]);
+
   const activeProviderObj = providers.find((p) => p.provider === selectedProvider);
   const activeCostItem = costData.find(
     (c) => c.provider.toLowerCase() === selectedProvider?.toLowerCase()
@@ -110,7 +118,7 @@ export default function HomePage() {
           <>
             {/* Horizontal Tabs Switcher */}
             <ProviderTabBar
-              providers={providers}
+              providers={providers.filter(p => settings?.enabled_providers?.includes(p.provider))}
               selectedProvider={selectedProvider}
               onSelectProvider={setSelectedProvider}
               theme={theme}
