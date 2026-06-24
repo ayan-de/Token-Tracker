@@ -13,7 +13,6 @@ export {
   X,
   Plus,
   Check,
-  ChevronRight,
   Globe,
   Monitor,
   Cookie,
@@ -30,4 +29,6 @@ export {
   User,
   Users,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
