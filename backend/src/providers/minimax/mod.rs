@@ -233,6 +233,18 @@ impl MiniMaxProvider {
     ) -> Result<ProviderFetchResult, ProviderError> {
         let (group_id, api_key) = self.read_api_key().await?;
 
+        if api_key.starts_with("sk-cp-") {
+            match self.fetch_remains_from_region(&group_id, &api_key, region).await {
+                Ok(result) => return Ok(result),
+                Err(ProviderError::AuthRequired) if region == MiniMaxRegion::Global => {
+                    if let Ok(result) = self.fetch_remains_from_region(&group_id, &api_key, MiniMaxRegion::ChinaMainland).await {
+                        return Ok(result);
+                    }
+                }
+                Err(_) => {} // fallback to billing usage
+            }
+        }
+
         match self.fetch_from_region(&group_id, &api_key, region).await {
             Ok(result) => Ok(result),
             Err(ProviderError::AuthRequired) if region == MiniMaxRegion::Global => {
@@ -241,6 +253,134 @@ impl MiniMaxProvider {
             }
             Err(e) => Err(e),
         }
+    }
+
+    /// Fetch remains (Coding Plan) from a specific region endpoint
+    async fn fetch_remains_from_region(
+        &self,
+        group_id: &str,
+        api_key: &str,
+        region: MiniMaxRegion,
+    ) -> Result<ProviderFetchResult, ProviderError> {
+        let client = crate::core::credentialed_http_client_builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| ProviderError::Other(e.to_string()))?;
+
+        let base_url = region.api_base_url();
+        let remains_url = format!(
+            "{}/v1/api/openplatform/coding_plan/remains?GroupId={}",
+            base_url, group_id
+        );
+
+        let resp = client
+            .get(&remains_url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("MM-API-Source", "CodexBar")
+            .send()
+            .await?;
+
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED
+            || resp.status() == reqwest::StatusCode::FORBIDDEN
+        {
+            return Err(ProviderError::AuthRequired);
+        }
+
+        if !resp.status().is_success() {
+            return Err(ProviderError::Other(format!(
+                "MiniMax remains API returned status {}",
+                resp.status()
+            )));
+        }
+
+        let json: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| ProviderError::Parse(e.to_string()))?;
+
+        let usage = self.parse_remains_response(&json)?;
+        Ok(ProviderFetchResult::new(usage, "api"))
+    }
+
+    fn parse_remains_response(
+        &self,
+        json: &serde_json::Value,
+    ) -> Result<UsageSnapshot, ProviderError> {
+        let base_resp = json.get("base_resp");
+        if let Some(base) = base_resp {
+            let status_code = base
+                .get("status_code")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(-1);
+            if status_code != 0 {
+                return Err(ProviderError::Parse(
+                    base.get("status_msg")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error")
+                        .to_string(),
+                ));
+            }
+        }
+
+        let remains_list = json
+            .get("model_remains")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| ProviderError::Parse("Missing model_remains in response".to_string()))?;
+
+        // Find the "general" model remains, or default to the first one
+        let remains = remains_list
+            .iter()
+            .find(|item| {
+                item.get("model_name")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s == "general")
+                    .unwrap_or(false)
+            })
+            .or_else(|| remains_list.first())
+            .ok_or_else(|| ProviderError::Parse("No remains items found".to_string()))?;
+
+        // 5h Limit (primary)
+        let primary_remains_percent = remains
+            .get("current_interval_remaining_percent")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(100.0);
+        let primary_used_percent = (100.0 - primary_remains_percent).clamp(0.0, 100.0);
+
+        let primary_resets_at = remains
+            .get("end_time")
+            .and_then(|v| v.as_i64())
+            .and_then(|ms| chrono::DateTime::from_timestamp(ms / 1000, 0));
+
+        let primary_window = RateWindow::with_details(
+            primary_used_percent,
+            Some(300), // 5 hours in minutes
+            primary_resets_at,
+            None,
+        );
+
+        let mut usage = UsageSnapshot::new(primary_window).with_login_method("MiniMax Coding Plan");
+
+        // Weekly Limit (secondary)
+        if let Some(weekly_remains_percent) = remains
+            .get("current_weekly_remaining_percent")
+            .and_then(|v| v.as_f64())
+        {
+            let weekly_used_percent = (100.0 - weekly_remains_percent).clamp(0.0, 100.0);
+            let weekly_resets_at = remains
+                .get("weekly_end_time")
+                .and_then(|v| v.as_i64())
+                .and_then(|ms| chrono::DateTime::from_timestamp(ms / 1000, 0));
+
+            let weekly_window = RateWindow::with_details(
+                weekly_used_percent,
+                Some(7 * 24 * 60), // 7 days in minutes
+                weekly_resets_at,
+                None,
+            );
+            usage = usage.with_secondary(weekly_window);
+        }
+
+        Ok(usage)
     }
 
     /// Fetch from a specific region endpoint
