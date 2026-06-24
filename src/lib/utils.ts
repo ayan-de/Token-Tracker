@@ -37,47 +37,51 @@ export function providerLabel(provider: string, explicitLabel?: string): string 
   return explicitLabel || provider.charAt(0).toUpperCase() + provider.slice(1);
 }
 
-export const PROVIDER_GRADIENTS: Record<string, string> = {
-  claude: "from-amber-500 to-orange-600",
-  codex: "from-emerald-500 to-teal-600",
-  gemini: "from-blue-500 to-indigo-600",
-  openai: "from-teal-500 to-cyan-600",
-  antigravity: "from-pink-500 to-rose-600",
-  cursor: "from-violet-500 to-purple-600",
-  opencode: "from-blue-600 to-cyan-600",
-  opencodego: "from-blue-600 to-cyan-600",
-  factory: "from-orange-500 to-red-600",
-  copilot: "from-purple-500 to-blue-600",
-  zai: "from-cyan-500 to-blue-600",
-  minimax: "from-violet-500 to-indigo-600",
-  kimi: "from-teal-500 to-blue-600",
-  kilo: "from-pink-500 to-rose-500",
-  kiro: "from-blue-500 to-indigo-500",
-  augment: "from-emerald-500 to-teal-600",
-  kimik2: "from-teal-500 to-blue-600",
-  moonshot: "from-indigo-500 to-purple-600",
-  amp: "from-cyan-500 to-blue-600",
-  ollama: "from-green-500 to-emerald-600",
-  synthetic: "from-pink-500 to-rose-600",
-  warp: "from-red-500 to-orange-600",
-  openrouter: "from-violet-500 to-purple-600",
-  windsurf: "from-blue-500 to-cyan-600",
-  zed: "from-orange-500 to-red-600",
-  mimo: "from-teal-500 to-cyan-600",
-  mistral: "from-red-500 to-pink-600",
-  deepseek: "from-orange-500 to-amber-600",
-  codebuff: "from-blue-500 to-indigo-600",
-  crof: "from-cyan-500 to-blue-600",
-  venice: "from-violet-500 to-purple-600",
-  stepfun: "from-pink-500 to-rose-600",
-  grok: "from-orange-500 to-yellow-600",
-  groq: "from-teal-500 to-emerald-600",
-  litellm: "from-blue-500 to-indigo-600",
-  deepgram: "from-rose-500 to-pink-600",
-  poe: "from-green-500 to-teal-600",
-  chutes: "from-indigo-500 to-blue-600",
+// Map provider keys to their logo filenames (checked at build-time via buildGradient)
+const LOGO_FILE: Record<string, string> = {
+  claude: "claude_code",
+  gemini: "gemini",
+  antigravity: "antigravity-color",
+  codex: "codex",
+  cursor: "cursor_light",
+  ollama: "ollama-light",
+  openrouter: "openrouter",
+  copilot: "github-copilot",
+  minimax: "minimax",
+  mistral: "mistral",
+  deepseek: "deepseek",
+  openai: "openai",
+  windsurf: "windsurf_light",
 };
 
+// Extracted at build-time via scripts/extract-logo-colors.js — do not edit manually
+// Format: from-[#rrggbb] to-[#rrggbb]
+const LOGO_GRADIENTS: Partial<Record<string, string>> = {
+  antigravity: "from-[#00b95c] to-[#00944a]",
+  claude: "from-[#d77655] to-[#ac5e44]",
+  codex: "from-[#b1a7ff] to-[#8e86cc]",
+  copilot: "from-[#9439d0] to-[#762ea6]",
+  cursor: "from-[#c1d039] to-[#9aa62e]",
+  deepseek: "from-[#4d6bfe] to-[#3e56cb]",
+  gemini: "from-[#9168c0] to-[#74539a]",
+  minimax: "from-[#e73562] to-[#b92a4e]",
+  mistral: "from-[#ffaf00] to-[#cc8c00]",
+  ollama: "from-[#d0395c] to-[#a62e4a]",
+  openai: "from-[#b7d039] to-[#92a62e]",
+  openrouter: "from-[#d09139] to-[#a6742e]",
+  windsurf: "from-[#d03970] to-[#a62e5a]",
+};
+
+// Fallback for providers with no SVG: deterministic hue from provider name
+// ponytail: hue-only hash — upgrade to per-provider saturation/lightness map if needed
+function hashFallbackGradient(provider: string): string {
+  let h = 0;
+  for (let i = 0; i < provider.length; i++) h = ((h << 5) - h + provider.charCodeAt(i)) | 0;
+  const hue = Math.abs(h % 360);
+  return `from-[hsl(${hue},62%,52%)] to-[hsl(${hue},52%,34%)]`;
+}
+
 export function getProviderGradient(provider: string): string {
-  return PROVIDER_GRADIENTS[provider.toLowerCase()] ?? "from-gray-500 to-gray-600";
+  const key = provider.toLowerCase();
+  return LOGO_GRADIENTS[key] ?? hashFallbackGradient(key);
 }
