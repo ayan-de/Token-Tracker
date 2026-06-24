@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
+import { PROVIDER_DESCRIPTORS, providerLogo, CredentialField } from "@/lib/dataMapping";
 import { Trash2 } from "@/lib/icons";
 
 interface SettingsModalProps {
@@ -12,7 +12,7 @@ interface SettingsModalProps {
   theme: 'dark' | 'light';
   onClose: () => void;
   onUpdateSettings: (newSettings: any) => Promise<boolean>;
-  onAddCredential: (provider: string, secret: string, type: "key" | "cookie") => Promise<boolean>;
+  onAddCredential: (provider: string, secret: string, type: "key" | "cookie", fields?: Record<string, string>) => Promise<boolean>;
   onRemoveCredential: (provider: string) => Promise<boolean>;
   onImportCookies: (browserId: string, profileId: string, providerId: string) => Promise<boolean>;
   onRefetchBrowsers: () => Promise<void>;
@@ -35,6 +35,7 @@ export default function SettingsModal({
   const [credProvider, setCredProvider] = useState<string>("claude");
   const [credType, setCredType] = useState<'key' | 'cookie'>('key');
   const [credSecret, setCredSecret] = useState<string>("");
+  const [credExtraFields, setCredExtraFields] = useState<Record<string, string>>({});
   const [importBrowserId, setImportBrowserId] = useState<string>("");
   const [importProfileId, setImportProfileId] = useState<string>("");
   const [importProviderId, setImportProviderId] = useState<string>("claude");
@@ -63,6 +64,12 @@ export default function SettingsModal({
       onUpdateSettings({ ...settings, enabled_providers: [...installedProviders] });
     }
   }, [settings, installedProviders]);
+
+  // Reset extra credential fields when provider changes
+  useEffect(() => {
+    setCredExtraFields({});
+    setCredSecret("");
+  }, [credProvider]);
 
   return (
     <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
@@ -286,36 +293,100 @@ export default function SettingsModal({
                       <option key={id} value={id}>{desc.displayName}</option>
                     ))}
                   </select>
-                  <select
-                    value={credType}
-                    onChange={(e) => setCredType(e.target.value as 'key' | 'cookie')}
-                    className="bg-primary border border-border-subtle rounded-lg px-2 py-1.5 text-text-main text-xs focus:outline-none flex-1"
-                  >
-                    <option value="key">API Key</option>
-                    <option value="cookie">Manual Cookie</option>
-                  </select>
+                  {(() => {
+                    const desc = PROVIDER_DESCRIPTORS[credProvider];
+                    if (desc?.credentialFields) {
+                      return (
+                        <select
+                          value={credType}
+                          onChange={(e) => setCredType(e.target.value as 'key' | 'cookie')}
+                          className="bg-primary border border-border-subtle rounded-lg px-2 py-1.5 text-text-main text-xs focus:outline-none flex-1"
+                        >
+                          <option value="key">API Key</option>
+                          <option value="cookie">Manual Cookie</option>
+                        </select>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    placeholder={credType === "key" ? "Paste API Key..." : "Paste Cookie Header (e.g. session=...)"}
-                    value={credSecret}
-                    onChange={(e) => setCredSecret(e.target.value)}
-                    className="bg-primary border border-border-subtle rounded-lg px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
-                  />
-                  <button
-                    onClick={async () => {
-                      if (!credSecret.trim()) return;
-                      const success = await onAddCredential(credProvider, credSecret.trim(), credType);
-                      if (success) {
-                        setCredSecret("");
-                      }
-                    }}
-                    className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-lg text-white transition-colors cursor-pointer border-0"
-                  >
-                    Add
-                  </button>
-                </div>
+
+                {(() => {
+                  const desc = PROVIDER_DESCRIPTORS[credProvider];
+                  const fields = desc?.credentialFields;
+                  if (fields && credType === 'key') {
+                    const fieldEntries = Object.values(fields) as CredentialField[];
+                    // Separate the api_key field (uses credSecret) from extra fields (group_id, etc.)
+                    const apiKeyField = fieldEntries.find(f => f.key === 'api_key');
+                    const extraFields = fieldEntries.filter(f => f.key !== 'api_key');
+                    return (
+                      <>
+                        {extraFields.map((field) => (
+                          <div key={field.key} className="flex gap-2">
+                            <input
+                              type={field.type}
+                              placeholder={field.placeholder}
+                              value={credExtraFields[field.key] ?? ''}
+                              onChange={(e) => setCredExtraFields(prev => ({ ...prev, [field.key]: e.target.value }))}
+                              className="bg-primary border border-border-subtle rounded-lg px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
+                            />
+                          </div>
+                        ))}
+                        <div className="flex gap-2">
+                          <input
+                            type="password"
+                            placeholder={apiKeyField?.placeholder ?? "API Key..."}
+                            value={credSecret}
+                            onChange={(e) => setCredSecret(e.target.value)}
+                            className="bg-primary border border-border-subtle rounded-lg px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
+                          />
+                          <button
+                            onClick={async () => {
+                              const missingField = extraFields.find(f => f.required && !credExtraFields[f.key]?.trim());
+                              if (missingField) return;
+                              if (!credSecret.trim()) return;
+                              const allExtraFields: Record<string, string> = {};
+                              for (const f of extraFields) {
+                                allExtraFields[f.key] = credExtraFields[f.key] ?? '';
+                              }
+                              const success = await onAddCredential(credProvider, credSecret.trim(), credType, allExtraFields);
+                              if (success) {
+                                setCredSecret("");
+                                setCredExtraFields({});
+                              }
+                            }}
+                            className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-lg text-white transition-colors cursor-pointer border-0"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </>
+                    );
+                  }
+                  return (
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder={credType === "key" ? "Paste API Key..." : "Paste Cookie Header (e.g. session=...)"}
+                        value={credSecret}
+                        onChange={(e) => setCredSecret(e.target.value)}
+                        className="bg-primary border border-border-subtle rounded-lg px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!credSecret.trim()) return;
+                          const success = await onAddCredential(credProvider, credSecret.trim(), credType);
+                          if (success) {
+                            setCredSecret("");
+                          }
+                        }}
+                        className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-lg text-white transition-colors cursor-pointer border-0"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
