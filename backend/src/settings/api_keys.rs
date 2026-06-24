@@ -15,6 +15,9 @@ pub struct ApiKeyEntry {
     /// Optional label for the key (e.g., "Personal", "Work")
     #[serde(default)]
     pub label: Option<String>,
+    /// Extra credential fields for providers that need multiple values (e.g., MiniMax group_id)
+    #[serde(default)]
+    pub extra_fields: HashMap<String, String>,
 }
 
 impl ApiKeys {
@@ -63,8 +66,36 @@ impl ApiKeys {
                 api_key: api_key.to_string(),
                 saved_at: now,
                 label: label.map(|s| s.to_string()),
+                extra_fields: HashMap::new(),
             },
         );
+    }
+
+    /// Set API key with extra fields for a provider
+    pub fn set_with_extra(&mut self, provider_id: &str, api_key: &str, extra_fields: HashMap<String, String>, label: Option<&str>) {
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M").to_string();
+        self.keys.insert(
+            provider_id.to_string(),
+            ApiKeyEntry {
+                api_key: api_key.to_string(),
+                saved_at: now,
+                label: label.map(|s| s.to_string()),
+                extra_fields,
+            },
+        );
+    }
+
+    /// Get a specific extra field for a provider
+    pub fn get_extra(&self, provider_id: &str, field: &str) -> Option<&str> {
+        self.keys.get(provider_id)
+            .and_then(|e| e.extra_fields.get(field))
+            .map(|s| s.as_str())
+    }
+
+    /// Get all extra fields for a provider
+    pub fn get_all_extras(&self, provider_id: &str) -> Option<&HashMap<String, String>> {
+        self.keys.get(provider_id)
+            .map(|e| &e.extra_fields)
     }
 
     /// Remove API key for a provider
