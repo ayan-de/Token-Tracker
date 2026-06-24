@@ -20,6 +20,7 @@ export default function HomePage() {
     settings,
     credentials,
     browsers,
+    installedProviders,
     refreshData,
     updateAppSettings,
     addCredential,
@@ -146,6 +147,7 @@ export default function HomePage() {
           settings={settings}
           credentials={credentials}
           browsers={browsers}
+          installedProviders={installedProviders}
           theme={theme}
           onClose={() => setSettingsOpen(false)}
           onUpdateSettings={updateAppSettings}

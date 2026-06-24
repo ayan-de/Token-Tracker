@@ -20,6 +20,7 @@ import type { CliStatus, ProviderUsage, CostItem } from "@/lib/types";
 interface UseCodexBarReturn {
   providers: ProviderUsage[];
   costData: CostItem[];
+  installedProviders: string[];
   cliStatus: CliStatus;
   error: string | null;
   isRefreshing: boolean;
@@ -45,6 +46,7 @@ export function useCodexBar(): UseCodexBarReturn {
   const [settings, setSettings] = useState<any | null>(null);
   const [credentials, setCredentials] = useState<any[]>([]);
   const [browsers, setBrowsers] = useState<any[]>([]);
+  const [installedProviders, setInstalledProviders] = useState<string[]>([]);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -81,6 +83,7 @@ export function useCodexBar(): UseCodexBarReturn {
     setIsRefreshing(true);
     try {
       const payload = await triggerRefresh();
+      setInstalledProviders(payload.installedProviders ?? []);
       const rawUsage = payload.usage ?? [];
       const rawCost = payload.cost ?? [];
       const usage = rawUsage.map(mapCLIUsage).filter((p): p is ProviderUsage => p !== null);
@@ -204,6 +207,7 @@ export function useCodexBar(): UseCodexBarReturn {
   return {
     providers,
     costData,
+    installedProviders,
     cliStatus,
     error,
     isRefreshing,

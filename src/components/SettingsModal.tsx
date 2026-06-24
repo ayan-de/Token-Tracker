@@ -8,6 +8,7 @@ interface SettingsModalProps {
   settings: any | null;
   credentials: any[];
   browsers: any[];
+  installedProviders: string[];
   theme: 'dark' | 'light';
   onClose: () => void;
   onUpdateSettings: (newSettings: any) => Promise<boolean>;
@@ -21,6 +22,7 @@ export default function SettingsModal({
   settings,
   credentials,
   browsers,
+  installedProviders,
   theme,
   onClose,
   onUpdateSettings,
@@ -54,6 +56,13 @@ export default function SettingsModal({
       }
     }
   }, [importBrowserId, browsers]);
+
+  // Auto-check all installed providers on first run when enabled_providers is empty
+  useEffect(() => {
+    if (settings && Array.isArray(settings.enabled_providers) && settings.enabled_providers.length === 0) {
+      onUpdateSettings({ ...settings, enabled_providers: [...installedProviders] });
+    }
+  }, [settings, installedProviders]);
 
   return (
     <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
@@ -220,7 +229,12 @@ export default function SettingsModal({
                       ) : (
                         <div className="w-1.5 h-1.5 rounded-full bg-accent-blue" />
                       )}
-                      <span className="text-[11px] font-medium text-text-main truncate">{desc.displayName}</span>
+                      <span className="text-[11px] font-medium text-text-main truncate">
+                        {desc.displayName}
+                        {installedProviders.includes(id) && (
+                          <span className="text-text-muted font-normal"> (installed)</span>
+                        )}
+                      </span>
                     </label>
                   );
                 })}
