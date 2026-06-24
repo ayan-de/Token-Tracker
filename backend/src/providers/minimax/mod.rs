@@ -19,6 +19,7 @@ use crate::core::{
     CostSnapshot, FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId,
     ProviderMetadata, RateWindow, SourceMode, UsageSnapshot,
 };
+use crate::settings::ApiKeys;
 
 const CODING_PLAN_PATH: &str = "/user-center/payment/coding-plan";
 const CODING_PLAN_QUERY: &str = "cycle_type=3";
@@ -185,6 +186,25 @@ impl MiniMaxProvider {
         }
     }
 
+    /// Save credentials to the native ~/.minimax/config.json file
+    pub fn save_config(api_key: &str, group_id: &str) -> Result<(), ProviderError> {
+        let config_path = Self::get_minimax_config_path()
+            .ok_or_else(|| ProviderError::Other("Could not determine MiniMax config path".to_string()))?;
+
+        let config_file = config_path.join("config.json");
+        let json = serde_json::to_string_pretty(&serde_json::json!({
+            "api_key": api_key,
+            "group_id": group_id,
+        })).map_err(|e| ProviderError::Other(e.to_string()))?;
+
+        std::fs::create_dir_all(&config_path)
+            .map_err(|e| ProviderError::Other(e.to_string()))?;
+        std::fs::write(&config_file, json)
+            .map_err(|e| ProviderError::Other(e.to_string()))?;
+
+        Ok(())
+    }
+
     /// Read MiniMax API key
     async fn read_api_key(&self) -> Result<(String, String), ProviderError> {
         // Check environment variables first
@@ -193,6 +213,17 @@ impl MiniMaxProvider {
             std::env::var("MINIMAX_API_KEY"),
         ) {
             return Ok((group_id, api_key));
+        }
+
+        // Check stored credentials (ApiKeys with extra_fields)
+        let api_keys = ApiKeys::load();
+        if let (Some(api_key), Some(group_id)) = (
+            api_keys.get("minimax"),
+            api_keys.get_extra("minimax", "group_id"),
+        ) {
+            if !api_key.is_empty() && !group_id.is_empty() {
+                return Ok((group_id.to_string(), api_key.to_string()));
+            }
         }
 
         // Check config file
