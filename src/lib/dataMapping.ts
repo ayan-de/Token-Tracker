@@ -30,7 +30,7 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
   zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
   minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly", importable: true },
   kimi:       { displayName: "Kimi",       logo: "",                          sessionLabel: "Weekly", weeklyLabel: "Rate Limit" },
-  kilo:       { displayName: "Kilo",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Kilo Pass" },
+  kilo:       { displayName: "Kilo",       logo: "/logos/kilocode-light.svg", logoDark: "/logos/kilocode-dark.svg", sessionLabel: "Credits", weeklyLabel: "Kilo Pass" },
   kiro:       { displayName: "Kiro",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Bonus" },
   augment:    { displayName: "Augment",    logo: "",                          sessionLabel: "Credits", weeklyLabel: "Usage" },
   kimik2:     { displayName: "Kimi K2",   logo: "",                          sessionLabel: "Credits", weeklyLabel: "Credits" },
