@@ -1,0 +1,33 @@
+// Centralized icon re-exports from lucide-react
+// Replace inline SVGs across the app with these imports
+
+export {
+  Sun, Moon,
+  RefreshCw,
+  Trash2,
+  Key,
+  BarChart3,
+  Heart,
+  Settings,
+  Info,
+  X,
+  Plus,
+  Check,
+  ChevronRight,
+  Globe,
+  Monitor,
+  Cookie,
+  Shield,
+  Bell,
+  Volume2,
+  Clock,
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  ExternalLink,
+  LogOut,
+  User,
+  Users,
+  Download,
+} from "lucide-react";
