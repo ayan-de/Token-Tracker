@@ -359,7 +359,7 @@ export default function SettingsModal({
                       className="bg-primary border border-border-subtle rounded-lg px-2.5 py-1.5 text-text-main text-xs focus:outline-none"
                     >
                       {Object.entries(PROVIDER_DESCRIPTORS)
-                        .filter(([id]) => ["claude", "codex", "cursor", "gemini", "copilot"].includes(id))
+                        .filter(([, desc]) => desc.importable)
                         .map(([id, desc]) => (
                           <option key={id} value={id}>{desc.displayName}</option>
                         ))}

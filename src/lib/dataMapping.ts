@@ -7,14 +7,15 @@ export interface ProviderDescriptor {
   sessionLabel: string;
   weeklyLabel: string;
   opusLabel?: string | null;
+  importable?: boolean;
 }
 
 export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
-  claude:     { displayName: "Claude",     logo: "/logos/claude_code.svg",       sessionLabel: "Session", weeklyLabel: "Weekly", opusLabel: "Sonnet" },
-  gemini:     { displayName: "Gemini",     logo: "/logos/gemini.svg",          sessionLabel: "Pro", weeklyLabel: "Flash", opusLabel: "Flash Lite" },
+  claude:     { displayName: "Claude",     logo: "/logos/claude_code.svg",       sessionLabel: "Session", weeklyLabel: "Weekly", opusLabel: "Sonnet", importable: true },
+  gemini:     { displayName: "Gemini",     logo: "/logos/gemini.svg",          sessionLabel: "Pro", weeklyLabel: "Flash", opusLabel: "Flash Lite", importable: true },
   antigravity:{ displayName: "Antigravity",logo: "/logos/antigravity-color.svg",          sessionLabel: "Gemini Models", weeklyLabel: "Claude and GPT" },
-  codex:      { displayName: "Codex",      logo: "/logos/codex.svg",           sessionLabel: "Session", weeklyLabel: "Weekly" },
-  cursor:     { displayName: "Cursor",     logo: "/logos/cursor_light.svg",    logoDark: "/logos/cursor_dark.svg",    sessionLabel: "Total", weeklyLabel: "Auto", opusLabel: "API" },
+  codex:      { displayName: "Codex",      logo: "/logos/codex.svg",           sessionLabel: "Session", weeklyLabel: "Weekly", importable: true },
+  cursor:     { displayName: "Cursor",     logo: "/logos/cursor_light.svg",    logoDark: "/logos/cursor_dark.svg",    sessionLabel: "Total", weeklyLabel: "Auto", opusLabel: "API", importable: true },
   ollama:     { displayName: "Ollama",     logo: "/logos/ollama-light.svg",     logoDark: "/logos/ollama-dark.svg", sessionLabel: "Session", weeklyLabel: "Weekly" },
   openrouter: { displayName: "OpenRouter",logo: "/logos/openrouter.svg",      sessionLabel: "Credits", weeklyLabel: "Usage" },
   perplexity: { displayName: "Perplexity",logo: "",                          sessionLabel: "Credits", weeklyLabel: "Bonus credits", opusLabel: "Purchased" },
@@ -25,9 +26,9 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
   opencode:   { displayName: "OpenCode",   logo: "/logos/opencode.svg",                          sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   opencodego: { displayName: "OpenCode Go",logo: "/logos/opencode.svg",      sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   factory:    { displayName: "Factory",    logo: "",                          sessionLabel: "Standard", weeklyLabel: "Premium" },
-  copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat" },
+  copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat", importable: true },
   zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
-  minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly" },
+  minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly", importable: true },
   kimi:       { displayName: "Kimi",       logo: "",                          sessionLabel: "Weekly", weeklyLabel: "Rate Limit" },
   kilo:       { displayName: "Kilo",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Kilo Pass" },
   kiro:       { displayName: "Kiro",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Bonus" },
