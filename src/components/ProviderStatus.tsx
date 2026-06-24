@@ -2,6 +2,7 @@
 
 import type { ProviderUsage } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
+import LoginMethodBadge from "@/components/LoginMethodBadge";
 
 interface ProviderStatusProps {
   provider: ProviderUsage;
@@ -63,9 +64,7 @@ export default function ProviderStatus({
         </div>
       </div>
       {p.usage?.loginMethod && (
-        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-bg-subtle text-text-main border border-border-subtle">
-          {p.usage.loginMethod}
-        </span>
+        <LoginMethodBadge loginMethod={p.usage.loginMethod} />
       )}
     </div>
   );
