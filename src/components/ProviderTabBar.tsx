@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useRef } from "react";
+import { useRef } from "react";
 import type { ProviderUsage } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 import { getProviderGradient } from "@/lib/utils";
@@ -37,34 +37,44 @@ export default function ProviderTabBar({
       </button>
 
       <div ref={scrollRef} className="flex items-center overflow-x-auto px-1 py-2.5 scrollbar-none">
-        {providers.map((p, i) => {
+        {providers.map((p) => {
           const isSelected = selectedProvider === p.provider;
           const desc = PROVIDER_DESCRIPTORS[p.provider.toLowerCase()] || { displayName: p.provider_label };
           return (
-            <Fragment key={p.provider}>
-              <button
-                onClick={() => onSelectProvider(p.provider)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer border-0 outline-none focus:outline-none shrink-0 ${
-                  isSelected
-                    ? `bg-accent-blue ${theme === 'light' ? 'text-black' : 'text-white'} shadow-md shadow-accent-blue/15 scale-[1.03] focus:bg-accent-blue ${theme === 'light' ? 'focus:text-black' : 'focus:text-white'}`
-                    : "bg-bg-subtle text-text-muted hover:text-text-main hover:bg-hover-subtle focus:bg-bg-subtle focus:text-text-main"
-                }`}
-              >
-                {providerLogo(p.provider, theme) ? (
-                  <img
-                    src={providerLogo(p.provider, theme)}
-                    alt=""
-                    className="w-4 h-4 object-contain"
-                  />
-                ) : (
-                  <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
-                )}
-                <span>{desc.displayName}</span>
-              </button>
-              {i < providers.length - 1 && (
-                <span className="shrink-0 w-px h-4 bg-border-subtle mx-1" aria-hidden />
+            <button
+              key={p.provider}
+              onClick={() => onSelectProvider(p.provider)}
+              className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-semibold whitespace-nowrap transition-all duration-300 cursor-pointer border-0 outline-none focus:outline-none shrink-0 ${
+                isSelected
+                  ? `text-white shadow-lg shadow-[#3b82f6]/25`
+                  : "bg-transparent text-text-muted hover:text-text-main hover:bg-hover-subtle"
+              }`}
+              style={isSelected ? { backgroundColor: '#3b82f6' } : undefined}
+            >
+              {providerLogo(p.provider, theme) ? (
+                <img
+                  src={providerLogo(p.provider, theme)}
+                  alt=""
+                  className={`w-5 h-5 object-contain transition-all ${isSelected ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
+                />
+              ) : (
+                <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
               )}
-            </Fragment>
+              <span>{desc.displayName}</span>
+              
+              {/* Progress bar under the tab (only if NOT selected to match the design) */}
+              {!isSelected ? (
+                <div className="w-8 h-1 bg-border-subtle/50 rounded-full overflow-hidden mt-0.5">
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`}
+                    style={{ width: `${Math.min(Math.max(p.usage?.primary?.usedPercent || 0, 0), 100)}%` }}
+                  />
+                </div>
+              ) : (
+                // Invisible spacer to maintain identical height/layout between selected and non-selected states
+                <div className="w-8 h-1 mt-0.5 opacity-0" />
+              )}
+            </button>
           );
         })}
       </div>
