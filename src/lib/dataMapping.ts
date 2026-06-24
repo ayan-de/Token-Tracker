@@ -8,6 +8,16 @@ export interface ProviderDescriptor {
   weeklyLabel: string;
   opusLabel?: string | null;
   importable?: boolean;
+  /** Schema for dynamic credential fields (e.g., MiniMax needs api_key + group_id) */
+  credentialFields?: Record<string, CredentialField>;
+}
+
+export interface CredentialField {
+  key: string;
+  label: string;
+  placeholder: string;
+  type: 'password' | 'text';
+  required: boolean;
 }
 
 export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
@@ -28,7 +38,10 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
   factory:    { displayName: "Factory",    logo: "",                          sessionLabel: "Standard", weeklyLabel: "Premium" },
   copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat", importable: true },
   zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
-  minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly", importable: true },
+  minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly", importable: true, credentialFields: {
+    api_key:   { key: 'api_key',   label: 'API Key',    placeholder: 'sk-cp-...',      type: 'password', required: true },
+    group_id: { key: 'group_id', label: 'Group ID',  placeholder: 'Your Group ID',  type: 'text',      required: true },
+  }},
   kimi:       { displayName: "Kimi",       logo: "",                          sessionLabel: "Weekly", weeklyLabel: "Rate Limit" },
   kilo:       { displayName: "Kilo",       logo: "/logos/kilocode-light.svg", logoDark: "/logos/kilocode-dark.svg", sessionLabel: "Credits", weeklyLabel: "Kilo Pass" },
   kiro:       { displayName: "Kiro",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "Bonus" },
