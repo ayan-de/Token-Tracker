@@ -94,7 +94,7 @@ function ProviderTabBar({
   ), [providers, selectedProvider, handleSelect]);
 
   return (
-    <div className="flex items-center border-b border-border-subtle bg-secondary/10">
+    <div className="flex items-center border-b border-border-subtle bg-secondary/10 will-change-transform">
       <button
         onClick={scrollLeft}
         className="flex-shrink-0 p-1.5 text-text-muted hover:text-text-main hover:bg-hover-subtle rounded transition-all cursor-pointer border-0"
@@ -103,7 +103,7 @@ function ProviderTabBar({
         <ChevronLeft className="w-3.5 h-3.5" />
       </button>
 
-      <div ref={scrollRef} className="flex items-center overflow-x-auto px-1 py-2.5 scrollbar-none">
+      <div ref={scrollRef} className="flex-1 min-w-0 flex items-center overflow-x-auto px-1 py-2.5 scrollbar-none will-change-transform">
         {tabs}
       </div>
 

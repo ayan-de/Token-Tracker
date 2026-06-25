@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, createContext, useContext } from "react";
 import { useCodexBar } from "@/hooks/useCodexBar";
 import ErrorBanner from "@/components/ErrorBanner";
+import FloatingThemeToggle from "@/components/FloatingThemeToggle";
 import ProviderDetail from "@/components/ProviderDetail";
 import ProviderHeader from "@/components/ProviderHeader";
 import ProviderTabBar from "@/components/ProviderTabBar";
@@ -196,11 +197,6 @@ export default function HomePage() {
     <ThemeContext.Provider value={themeContextValue}>
       <ModalContext.Provider value={modalContextValue}>
       <div className="relative flex flex-col h-screen w-screen bg-primary text-text-main overflow-hidden font-outfit select-none">
-
-        {/* Premium background gradient blobs */}
-        <div className="absolute top-[-10%] left-[-15%] w-[70%] h-[50%] bg-accent-blue/10 rounded-full blur-[90px] pointer-events-none" />
-        <div className="absolute bottom-[-10%] right-[-15%] w-[70%] h-[50%] bg-accent-purple/10 rounded-full blur-[90px] pointer-events-none" />
-
         {/* Main Container */}
         <div className="relative flex flex-col flex-1 min-h-0 z-10">
 
@@ -273,6 +269,8 @@ export default function HomePage() {
 
       </div>
       </ModalContext.Provider>
+
+      <FloatingThemeToggle />
     </ThemeContext.Provider>
   );
 }
