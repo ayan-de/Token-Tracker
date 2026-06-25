@@ -7,6 +7,7 @@ import LimitStatusBars from "./LimitStatusBars";
 import LimitLineGraph from "./LimitLineGraph";
 import CreditsCost from "./CreditsCost";
 import ActionMenu from "./ActionMenu";
+import ErrorBoundary from "./ErrorBoundary";
 import { useModals } from "@/app/page";
 
 interface ProviderDetailProps {
@@ -20,24 +21,37 @@ export default memo(function ProviderDetail({
 }: ProviderDetailProps) {
   const { openAddAccount, openSettings, openAbout } = useModals();
 
+  const statusLoader = <div className="animate-pulse h-16 bg-[var(--color-border)] rounded-lg" />;
+  const limitLoader = <div className="animate-pulse h-24 bg-[var(--color-border)] rounded-lg" />;
+  const graphLoader = <div className="animate-pulse h-40 bg-[var(--color-border)] rounded-lg" />;
+  const costLoader = <div className="animate-pulse h-20 bg-[var(--color-border)] rounded-lg" />;
+
   return (
     <div className="flex flex-col flex-1 overflow-y-auto px-4 py-2 font-outfit">
-      <ProviderStatus
-        provider={provider}
-        onOpenAddAccountModal={openAddAccount}
-      />
+      <ErrorBoundary loader={statusLoader}>
+        <ProviderStatus
+          provider={provider}
+          onOpenAddAccountModal={openAddAccount}
+        />
+      </ErrorBoundary>
 
-      <LimitStatusBars
-        provider={provider}
-        onOpenAddAccountModal={openAddAccount}
-      />
+      <ErrorBoundary loader={limitLoader}>
+        <LimitStatusBars
+          provider={provider}
+          onOpenAddAccountModal={openAddAccount}
+        />
+      </ErrorBoundary>
 
-      <LimitLineGraph provider={provider} />
+      <ErrorBoundary loader={graphLoader}>
+        <LimitLineGraph provider={provider} />
+      </ErrorBoundary>
 
-      <CreditsCost
-        provider={provider}
-        costItem={costItem}
-      />
+      <ErrorBoundary loader={costLoader}>
+        <CreditsCost
+          provider={provider}
+          costItem={costItem}
+        />
+      </ErrorBoundary>
 
       <ActionMenu
         provider={provider}
