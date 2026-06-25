@@ -35,15 +35,20 @@ const ProviderTab = memo(function ProviderTab({
       }`}
       style={isSelected ? { backgroundColor: '#3b82f6' } : undefined}
     >
-      {providerLogo(p.provider, theme) ? (
-        <img
-          src={providerLogo(p.provider, theme)}
-          alt=""
-          className={`w-5 h-5 object-contain ${isSelected ? 'opacity-100' : 'opacity-80'}`}
-        />
-      ) : (
-        <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
-      )}
+      <div className={`relative flex items-center justify-center ${isSelected ? 'w-8 h-8' : ''}`}>
+        {isSelected && (
+          <div className="absolute inset-0 rounded-full bg-white" style={{ boxShadow: '0 0 10px 2px rgba(255, 255, 255, 0.5), 0 0 25px 8px rgba(255, 255, 255, 0.4), 0 0 50px 15px rgba(255, 255, 255, 0.3), 0 0 100px 30px rgba(255, 255, 255, 0.15)' }} />
+        )}
+        {providerLogo(p.provider, theme) ? (
+          <img
+            src={providerLogo(p.provider, theme)}
+            alt=""
+            className={`w-5 h-5 object-contain relative z-10 ${isSelected ? 'opacity-100' : 'opacity-80'}`}
+          />
+        ) : (
+          <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)} relative z-10`} />
+        )}
+      </div>
       <span>{desc.displayName}</span>
 
       {/* Progress bar under the tab (only if NOT selected to match the design) */}
