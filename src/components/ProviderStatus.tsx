@@ -45,7 +45,7 @@ export default memo(function ProviderStatus({
             <img src={providerLogo(p.provider, theme)} alt="" className="w-8 h-8 object-contain" />
           )}
           <div className="flex flex-col">
-            <h2 className="text-lg font-bold text-text-main leading-tight">{desc.displayName}</h2>
+            <h2 className="text-lg font-bold text-text-main leading-tight flex items-center gap-1">{desc.displayName}{p.usage?.accountEmail && <span className="text-[11px] font-normal text-text-muted/75 border border-border-subtle px-1 py-0.5 rounded align-middle ml-1">{p.usage.accountEmail}</span>}</h2>
             <span className="text-[11px] text-text-muted/75">{lastUpdatedText}</span>
           </div>
         </div>
@@ -60,7 +60,7 @@ export default memo(function ProviderStatus({
           <img src={providerLogo(p.provider, theme)} alt="" className="w-8 h-8 object-contain" />
         )}
         <div className="flex flex-col">
-          <h2 className="text-lg font-bold text-text-main leading-tight">{desc.displayName}</h2>
+          <h2 className="text-lg font-bold text-text-main leading-tight flex items-center gap-1">{desc.displayName}{p.usage?.accountEmail && <span className="text-[11px] font-normal text-text-muted/75 border border-border-subtle px-1 py-0.5 rounded align-middle ml-1">{p.usage.accountEmail}</span>}</h2>
           <span className="text-[11px] text-text-muted/75">{lastUpdatedText}</span>
         </div>
       </div>

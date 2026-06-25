@@ -185,7 +185,7 @@ export function mapProviderUsage(raw: any): ProviderUsage | null {
       updatedAt: usageRaw.providerCost.updatedAt,
     } : null,
     loginMethod: usageRaw.loginMethod,
-    accountEmail: usageRaw.accountEmail,
+    accountEmail: usageRaw.usage?.accountEmail ?? usageRaw.accountEmail,
     updatedAt: usageRaw.updatedAt,
     identity: usageRaw.identity ? {
       providerID: usageRaw.identity.providerID,
