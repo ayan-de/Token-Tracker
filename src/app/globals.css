@@ -107,4 +107,87 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Glass Shine Badge Animations */
+  @keyframes glass-shine {
+    0% {
+      left: -150%;
+    }
+    20% {
+      left: 150%;
+    }
+    100% {
+      left: 150%;
+    }
+  }
+
+  @keyframes glow-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .glass-shine-badge {
+    position: relative;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(
+      120deg,
+      rgba(139, 92, 246, 0.15) 0%,
+      rgba(236, 72, 153, 0.15) 25%,
+      rgba(10, 11, 13, 0.8) 50%,
+      rgba(59, 130, 246, 0.15) 75%,
+      rgba(139, 92, 246, 0.15) 100%
+    );
+    background-size: 200% 200%;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.2);
+    animation: glow-shift 6s ease infinite;
+    transition: all 0.3s ease;
+  }
+
+  /* Glass shine animation sweeping across */
+  .glass-shine-badge::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 40px;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.08) 20%,
+      rgba(255, 255, 255, 0.35) 50%,
+      rgba(255, 255, 255, 0.08) 80%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    transform: skewX(-25deg);
+    animation: glass-shine 4s infinite ease-in-out;
+    pointer-events: none;
+  }
+
+  /* Light mode overrides */
+  :root.light-mode .glass-shine-badge {
+    background: linear-gradient(
+      120deg,
+      rgba(139, 92, 246, 0.08) 0%,
+      rgba(236, 72, 153, 0.08) 25%,
+      rgba(243, 244, 246, 0.8) 50%,
+      rgba(59, 130, 246, 0.08) 75%,
+      rgba(139, 92, 246, 0.08) 100%
+    );
+    background-size: 200% 200%;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.05);
+  }
 }
