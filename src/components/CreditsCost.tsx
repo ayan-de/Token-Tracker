@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import type { ProviderUsage, CostItem } from "@/lib/types";
 
 interface CreditsCostProps {
@@ -8,7 +8,7 @@ interface CreditsCostProps {
   costItem?: CostItem;
 }
 
-export default function CreditsCost({ provider: p, costItem }: CreditsCostProps) {
+export default memo(function CreditsCost({ provider: p, costItem }: CreditsCostProps) {
   const [costExpanded, setCostExpanded] = useState(false);
 
   if (p.unavailable || !costItem) {
@@ -54,4 +54,4 @@ export default function CreditsCost({ provider: p, costItem }: CreditsCostProps)
       )}
     </div>
   );
-}
+});

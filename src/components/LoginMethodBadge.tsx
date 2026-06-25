@@ -4,7 +4,7 @@ interface LoginMethodBadgeProps {
 
 export default function LoginMethodBadge({ loginMethod }: LoginMethodBadgeProps) {
   return (
-    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-bg-subtle text-text-main border border-border-subtle">
+    <span className="relative overflow-hidden text-xs font-semibold px-2.5 py-1 rounded-full glass-shine-badge text-text-main select-none">
       {loginMethod}
     </span>
   );
