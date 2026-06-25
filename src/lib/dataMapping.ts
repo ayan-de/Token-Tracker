@@ -1,4 +1,4 @@
-import type { ProviderUsage, CostItem, RawCliUsageItem, RawCliCostItem, ProviderUsageDetails, PacingStage } from "./types";
+import type { ProviderUsage, CostItem, ProviderUsageDetails, PacingStage } from "./types";
 
 export interface ProviderDescriptor {
   displayName: string;
@@ -77,7 +77,7 @@ export function providerLogo(provider: string, theme: 'dark' | 'light' = 'dark')
   return desc.logo || "";
 }
 
-export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {
+export function mapProviderUsage(raw: any): ProviderUsage | null {
   const provider = raw.provider || "unknown";
   const errorMessage = raw.error?.message || "Usage is temporarily unavailable.";
   const hasUsage = Boolean(raw.usage);
@@ -164,7 +164,7 @@ export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {
       unit: usageRaw.tertiary.unit ?? "requests",
       pacing: usageRaw.tertiary.pacing ? { stage: usageRaw.tertiary.pacing.stage as PacingStage } : null,
     } : null,
-    extraRateWindows: usageRaw.extraRateWindows ? usageRaw.extraRateWindows.map((ew) => ({
+    extraRateWindows: usageRaw.extraRateWindows ? usageRaw.extraRateWindows.map((ew: any) => ({
       id: ew.id,
       title: ew.title,
       window: {
@@ -206,7 +206,7 @@ export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {
   };
 }
 
-export function mapCLICost(raw: RawCliCostItem): CostItem {
+export function mapProviderCost(raw: any): CostItem {
   const provider = raw.provider || "unknown";
   const totalCostUSD = raw.sessionCostUSD || 0;
   const last30DaysCostUSD =

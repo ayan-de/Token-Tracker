@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, createContext, useContext } from "react";
-import { useCodexBar } from "@/hooks/useCodexBar";
+import { useProviders } from "@/hooks/useProviders";
 import ErrorBanner from "@/components/ErrorBanner";
 import FloatingThemeToggle from "@/components/FloatingThemeToggle";
 import ProviderDetail from "@/components/ProviderDetail";
@@ -47,7 +47,7 @@ export default function HomePage() {
   const {
     providers,
     costData,
-    cliStatus,
+    backendStatus,
     error,
     isRefreshing,
     settings,
@@ -60,7 +60,7 @@ export default function HomePage() {
     removeCredential,
     importBrowserCookies,
     refetchBrowsers,
-  } = useCodexBar();
+  } = useProviders();
 
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -202,7 +202,7 @@ export default function HomePage() {
 
           {/* App Title & Refresh Bar */}
           {/* <ProviderHeader
-            cliStatus={cliStatus}
+            backendStatus={backendStatus}
             isRefreshing={isRefreshing}
             onRefresh={refreshData}
           /> */}

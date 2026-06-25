@@ -1,13 +1,13 @@
 "use client";
 
-import type { CliStatus } from "@/lib/types";
+import type { BackendStatus } from "@/lib/types";
 
 const STATUS_CONFIG: Record<
   string,
   { label: string; dotClass: string; textClass: string }
 > = {
   available: {
-    label: "CLI Connected",
+    label: "Backend Connected",
     dotClass: "bg-status-ok",
     textClass: "text-status-ok",
   },
@@ -27,14 +27,14 @@ const STATUS_CONFIG: Record<
     textClass: "text-status-warning",
   },
   error: {
-    label: "CLI Error",
+    label: "Backend Error",
     dotClass: "bg-status-danger",
     textClass: "text-status-danger",
   },
 };
 
 interface StatusBadgeProps {
-  status: CliStatus;
+  status: BackendStatus;
 }
 
 export default function StatusBadge({ status }: StatusBadgeProps) {

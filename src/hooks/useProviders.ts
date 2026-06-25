@@ -14,14 +14,14 @@ import {
   getBrowsers,
   importCookies,
 } from "@/lib/apiClient";
-import { mapCLIUsage, mapCLICost } from "@/lib/dataMapping";
-import type { CliStatus, ProviderUsage, CostItem } from "@/lib/types";
+import { mapProviderUsage, mapProviderCost } from "@/lib/dataMapping";
+import type { BackendStatus, ProviderUsage, CostItem } from "@/lib/types";
 
-interface UseCodexBarReturn {
+interface UseProvidersReturn {
   providers: ProviderUsage[];
   costData: CostItem[];
   installedProviders: string[];
-  cliStatus: CliStatus;
+  backendStatus: BackendStatus;
   error: string | null;
   isRefreshing: boolean;
   settings: any | null;
@@ -37,10 +37,10 @@ interface UseCodexBarReturn {
   refetchBrowsers: () => Promise<void>;
 }
 
-export function useCodexBar(): UseCodexBarReturn {
+export function useProviders(): UseProvidersReturn {
   const [providers, setProviders] = useState<ProviderUsage[]>([]);
   const [costData, setCostData] = useState<CostItem[]>([]);
-  const [cliStatus, setCliStatus] = useState<CliStatus>({ status: "connecting" });
+  const [backendStatus, setBackendStatus] = useState<BackendStatus>({ status: "connecting" });
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [settings, setSettings] = useState<any | null>(null);
@@ -54,12 +54,12 @@ export function useCodexBar(): UseCodexBarReturn {
     try {
       const health = await getHealth();
       if (health.status === "healthy") {
-        setCliStatus({ status: "available" });
+        setBackendStatus({ status: "available" });
         try {
           const rawUsage = await getProviders();
           const rawCost = await getCost();
-          const usage = rawUsage.map(mapCLIUsage).filter((p): p is ProviderUsage => p !== null);
-          const costs = rawCost.map(mapCLICost).filter((c) => c !== null);
+          const usage = rawUsage.map(mapProviderUsage).filter((p): p is ProviderUsage => p !== null);
+          const costs = rawCost.map(mapProviderCost).filter((c) => c !== null);
           setProviders(usage);
           setCostData(costs);
           setError(null);
@@ -68,11 +68,11 @@ export function useCodexBar(): UseCodexBarReturn {
           setError(`Failed to load cached data: ${err}`);
         }
       } else {
-        setCliStatus({ status: "error" });
+        setBackendStatus({ status: "error" });
       }
     } catch (err) {
       console.error("Sync error:", err);
-      setCliStatus({ status: "error" });
+      setBackendStatus({ status: "error" });
       setError(`Backend sync error: ${err}`);
     }
   }, []);
@@ -86,8 +86,8 @@ export function useCodexBar(): UseCodexBarReturn {
       setInstalledProviders(payload.installedProviders ?? []);
       const rawUsage = payload.usage ?? [];
       const rawCost = payload.cost ?? [];
-      const usage = rawUsage.map(mapCLIUsage).filter((p): p is ProviderUsage => p !== null);
-      const costs = rawCost.map(mapCLICost).filter((c) => c !== null);
+      const usage = rawUsage.map(mapProviderUsage).filter((p): p is ProviderUsage => p !== null);
+      const costs = rawCost.map(mapProviderCost).filter((c) => c !== null);
       setProviders(usage);
       setCostData(costs);
       setError(null);
@@ -210,7 +210,7 @@ export function useCodexBar(): UseCodexBarReturn {
     providers,
     costData,
     installedProviders,
-    cliStatus,
+    backendStatus,
     error,
     isRefreshing,
     settings,
