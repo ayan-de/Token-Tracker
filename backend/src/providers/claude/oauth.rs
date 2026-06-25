@@ -117,6 +117,13 @@ pub struct ExtraUsage {
     pub currency: Option<String>,
 }
 
+/// OAuth account info response
+#[derive(Debug, Deserialize)]
+struct OAuthAccountResponse {
+    #[serde(rename = "email_address")]
+    email_address: Option<String>,
+}
+
 /// Claude OAuth fetcher
 pub struct ClaudeOAuthFetcher {
     client: Client,
@@ -126,6 +133,7 @@ static RATE_LIMIT_BACKOFF_UNTIL: OnceLock<Mutex<Option<Instant>>> = OnceLock::ne
 
 impl ClaudeOAuthFetcher {
     const USAGE_URL: &'static str = "https://api.anthropic.com/api/oauth/usage";
+    const ACCOUNT_URL: &'static str = "https://api.anthropic.com/api/oauth/account";
     const CREDENTIALS_PATH: &'static str = ".claude/.credentials.json";
     const KEYRING_SERVICE: &'static str = "Claude Code-credentials";
     const ENV_TOKEN_KEY: &'static str = "CODEXBAR_CLAUDE_OAUTH_TOKEN";
@@ -172,7 +180,8 @@ impl ClaudeOAuthFetcher {
         credentials: ClaudeOAuthCredentials,
     ) -> Result<ProviderFetchResult, ProviderError> {
         let usage_response = self.fetch_usage(&credentials).await?;
-        let usage = self.build_usage_snapshot(&usage_response, &credentials);
+        let email = self.fetch_account_info(&credentials).await.ok().and_then(|acc| acc.email_address);
+        let usage = self.build_usage_snapshot(&usage_response, &credentials, email);
         Ok(ProviderFetchResult::new(usage, "oauth"))
     }
 
@@ -484,6 +493,39 @@ impl ClaudeOAuthFetcher {
         Ok(usage)
     }
 
+    /// Fetch account info (includes email) from OAuth API
+    async fn fetch_account_info(
+        &self,
+        credentials: &ClaudeOAuthCredentials,
+    ) -> Result<OAuthAccountResponse, ProviderError> {
+        let response = self
+            .client
+            .get(Self::ACCOUNT_URL)
+            .header("Authorization", format!("Bearer {}", credentials.access_token))
+            .header("Accept", "application/json")
+            .header("anthropic-beta", "oauth-2025-04-20")
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ProviderError::OAuth(format!(
+                "Failed to get OAuth account info: {} - {}",
+                status,
+                body.chars().take(200).collect::<String>()
+            )));
+        }
+
+        let account: OAuthAccountResponse = response
+            .json()
+            .await
+            .map_err(|e| ProviderError::Parse(format!("Failed to parse OAuth account response: {}", e)))?;
+
+        Ok(account)
+    }
+
     fn rate_limit_gate() -> &'static Mutex<Option<Instant>> {
         RATE_LIMIT_BACKOFF_UNTIL.get_or_init(|| Mutex::new(None))
     }
@@ -546,6 +588,7 @@ impl ClaudeOAuthFetcher {
         &self,
         response: &OAuthUsageResponse,
         credentials: &ClaudeOAuthCredentials,
+        email: Option<String>,
     ) -> UsageSnapshot {
         // Primary: 5-hour session window
         let primary = response
@@ -601,6 +644,11 @@ impl ClaudeOAuthFetcher {
             usage = usage.with_login_method(tier);
         } else {
             usage = usage.with_login_method("Claude (OAuth)");
+        }
+
+        // Email from account info
+        if let Some(e) = email {
+            usage = usage.with_email(e);
         }
 
         usage
