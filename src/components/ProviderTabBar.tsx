@@ -50,7 +50,7 @@ const ProviderTab = memo(function ProviderTab({
       {!isSelected ? (
         <div className="w-8 h-1 bg-border-subtle/50 rounded-full overflow-hidden mt-0.5">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${getProviderGradient(p.provider)}`}
+            className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${getProviderGradient(p.provider)}`}
             style={{ width: `${Math.min(Math.max(p.usage?.primary?.usedPercent || 0, 0), 100)}%` }}
           />
         </div>
