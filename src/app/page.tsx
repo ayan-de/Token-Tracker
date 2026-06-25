@@ -205,11 +205,11 @@ export default function HomePage() {
         <div className="relative flex flex-col flex-1 min-h-0 z-10">
 
           {/* App Title & Refresh Bar */}
-          <ProviderHeader
+          {/* <ProviderHeader
             cliStatus={cliStatus}
             isRefreshing={isRefreshing}
             onRefresh={refreshData}
-          />
+          /> */}
 
           <ErrorBanner message={error} />
 
