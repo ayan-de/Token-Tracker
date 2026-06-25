@@ -522,6 +522,12 @@ impl AntigravityProvider {
             );
         }
 
+        // Add email if available
+        let email = user_status.email.clone();
+        if let Some(e) = email {
+            snapshot = snapshot.with_email(e);
+        }
+
         // Add plan info
         let plan_name = user_status
             .plan_status
@@ -591,7 +597,6 @@ struct UserStatusResponse {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UserStatus {
-    #[allow(dead_code)]
     email: Option<String>,
     plan_status: Option<PlanStatus>,
     cascade_model_config_data: Option<ModelConfigData>,
