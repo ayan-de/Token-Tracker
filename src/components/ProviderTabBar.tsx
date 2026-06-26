@@ -28,7 +28,7 @@ const ProviderTab = memo(function ProviderTab({
   return (
     <button
       onClick={() => onSelect(p.provider)}
-      className={`flex flex-col items-center justify-center gap-1.5 px-3 py-2 rounded-sm text-[10px] font-semibold whitespace-nowrap cursor-pointer border-0 outline-none focus:outline-none flex-1 min-w-0 ${
+      className={`flex flex-col items-center justify-center gap-1.5 px-3 py-2 rounded-sm text-[10px] font-semibold whitespace-nowrap cursor-pointer border-0 outline-none focus:outline-none flex-none ${
         isSelected
           ? `text-white shadow-lg shadow-[#3b82f6]/25`
           : "bg-transparent text-text-muted hover:text-text-main hover:bg-hover-subtle"
