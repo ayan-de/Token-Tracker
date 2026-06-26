@@ -16,6 +16,7 @@ const FREEMODEL_API_BASE: &str = "https://freemodel.dev";
 const FREEMODEL_CREDENTIAL_TARGET: &str = "codexbar-freemodel";
 
 #[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct UsageResponse {
     #[serde(default)]
     total_requests: u64,
@@ -250,7 +251,7 @@ impl FreeModelProvider {
             used_5h_pct,
             Some(5 * 60),
             resets_5h,
-            Some(format!("{:.2}", usage.window5h.used_cents / 100.0)),
+            None,
         );
 
         // Weekly window
@@ -270,7 +271,7 @@ impl FreeModelProvider {
             used_week_pct,
             Some(7 * 24 * 60),
             resets_week,
-            Some(format!("{:.2}", usage.window_week.used_cents / 100.0)),
+            None,
         );
 
         let mut snapshot = UsageSnapshot::new(primary).with_secondary(secondary);
@@ -326,5 +327,33 @@ impl Provider for FreeModelProvider {
 
     fn available_sources(&self) -> Vec<SourceMode> {
         vec![SourceMode::Auto, SourceMode::OAuth]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_usage_response_deserialization() {
+        let json = r#"{
+  "totalRequests":110,
+  "totalTokens":4607446,
+  "avgLatency":16211,
+  "todayCacheReadTokens":2258714,
+  "todayCacheWriteTokens":597259,
+  "window5h":{"usedCents":184,"limitCents":1000,"resetsAt":1782506376},
+  "windowWeek":{"usedCents":1189,"limitCents":6667,"resetsAt":1783022779}
+}"#;
+
+        let resp: UsageResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.window5h.used_cents, 184.0);
+        assert_eq!(resp.window5h.limit_cents, 1000.0);
+        assert_eq!(resp.window_week.used_cents, 1189.0);
+        assert_eq!(resp.window_week.limit_cents, 6667.0);
+        // Weekly percentage: 1189/6667 * 100 ≈ 17.83%
+        let expected_pct = (1189.0 / 6667.0) * 100.0;
+        let actual_pct = (resp.window_week.used_cents / resp.window_week.limit_cents) * 100.0;
+        assert!((actual_pct - expected_pct).abs() < 0.01);
     }
 }

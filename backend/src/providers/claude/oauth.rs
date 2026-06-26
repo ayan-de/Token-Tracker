@@ -756,7 +756,7 @@ mod tests {
             scopes: vec!["user:profile".to_string()],
             rate_limit_tier: Some("default_claude_ai".to_string()),
         };
-        let usage = ClaudeOAuthFetcher::new().build_usage_snapshot(&response, &credentials);
+        let usage = ClaudeOAuthFetcher::new().build_usage_snapshot(&response, &credentials, None);
 
         assert_eq!(usage.primary.used_percent, 100.0);
         assert!((usage.secondary.expect("weekly").used_percent - 14.0).abs() < 0.001);
