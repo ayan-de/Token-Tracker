@@ -220,7 +220,8 @@ impl TokenAccountSupport {
             | ProviderId::LiteLLM
             | ProviderId::Poe
             | ProviderId::Devin
-            | ProviderId::Zed => None,
+            | ProviderId::Zed
+            | ProviderId::FreeModel => None,
         }
     }
 
