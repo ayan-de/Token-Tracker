@@ -36,6 +36,9 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
   opencode:   { displayName: "OpenCode",   logo: "/logos/opencode.svg",                          sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   opencodego: { displayName: "OpenCode Go",logo: "/logos/opencode.svg",      sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   factory:    { displayName: "Factory",    logo: "",                          sessionLabel: "Standard", weeklyLabel: "Premium" },
+  freemodel: { displayName: "FreeModel",  logo: "/logos/freemodel.svg",   sessionLabel: "Session", weeklyLabel: "Weekly", importable: true, credentialFields: {
+    bm_session: { key: 'bm_session', label: 'Session Cookie (bm_session)', placeholder: 'bm_session=...', type: 'password', required: true },
+  }},
   copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat", importable: true },
   zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
   minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly", importable: true, credentialFields: {

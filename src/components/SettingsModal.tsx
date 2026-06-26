@@ -35,6 +35,16 @@ export default function SettingsModal({
   const [credProvider, setCredProvider] = useState<string>("claude");
   const [credType, setCredType] = useState<'key' | 'cookie'>('key');
   const [credSecret, setCredSecret] = useState<string>("");
+
+  // Auto-select cookie type for cookie-only providers (no api_key field)
+  useEffect(() => {
+    const desc = PROVIDER_DESCRIPTORS[credProvider];
+    const fields = desc?.credentialFields;
+    const hasApiKey = fields ? Object.values(fields as unknown as CredentialField[]).some(f => f.key === 'api_key') : false;
+    if (!hasApiKey) {
+      setCredType('cookie');
+    }
+  }, [credProvider]);
   const [credExtraFields, setCredExtraFields] = useState<Record<string, string>>({});
   const [importBrowserId, setImportBrowserId] = useState<string>("");
   const [importProfileId, setImportProfileId] = useState<string>("");
@@ -296,6 +306,10 @@ export default function SettingsModal({
                   {(() => {
                     const desc = PROVIDER_DESCRIPTORS[credProvider];
                     if (desc?.credentialFields) {
+                      const fieldEntries = Object.values(desc.credentialFields) as CredentialField[];
+                      const hasApiKey = fieldEntries.some(f => f.key === 'api_key');
+                      // If no api_key field, it's cookie-only — skip type dropdown
+                      if (!hasApiKey) return null;
                       return (
                         <select
                           value={credType}
@@ -316,8 +330,9 @@ export default function SettingsModal({
                   const fields = desc?.credentialFields;
                   if (fields && credType === 'key') {
                     const fieldEntries = Object.values(fields) as CredentialField[];
-                    // Separate the api_key field (uses credSecret) from extra fields (group_id, etc.)
                     const apiKeyField = fieldEntries.find(f => f.key === 'api_key');
+                    // If no api_key field, show nothing for key branch
+                    if (!apiKeyField) return null;
                     const extraFields = fieldEntries.filter(f => f.key !== 'api_key');
                     return (
                       <>
