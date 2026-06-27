@@ -53,7 +53,7 @@ CodexBar CLI (codexbar usage/cost --json)
 
 - [Rust](https://rustup.rs/) (latest stable)
 - [Node.js](https://nodejs.org/) 20+
-- CodexBar CLI — install from [releases](https://github.com/opencode-ai/codexbar) or `cargo install codexbar`
+
 
 ### Development
 
