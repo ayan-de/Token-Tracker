@@ -1,85 +1,103 @@
-# 📊 TokenTracker Desktop
+# TokenTracker
 
-**TokenTracker** is a premium, lightweight cross-platform desktop application designed to monitor your local and cloud-based AI provider quotas, rate limits, and spend statistics. 
 
-Inspired by the original macOS *CodexBar* popover application, TokenTracker brings a sleek, glassmorphic popover user interface to **Linux** and **Windows** desktops.
+TokenTracker is a cross-platform desktop application that monitors AI provider quotas, rate limits, and spend statistics in real-time. It wraps the [CodexBar CLI](https://github.com/opencode-ai/codexbar) and presents data in a clean, macOS-inspired popover with glassmorphic design and dark/light theme support.
 
----
+![Dark Mode](/public/logos/image.png)
 
-## ✨ Features
+![Light Mode](/public/logos/image%20copy.png)
 
-- **Mac-like Popover UI**: Sleek, transparent, modern glassmorphic tabs and brand-colored progress bars.
-- **Dark & Light Mode Switcher**: Instantly switch themes with a smooth transition.
-- **Detailed Rate Windows**: Track Session, Weekly, and custom extra rate limits (e.g. Sonnet, Flash) for each provider.
-- **Spend & Cost Breakdown**: Visual drop-downs displaying daily cost metrics and model-by-model cost details.
-- **Built-in CLI Console**: A collapsible drawer terminal at the bottom to execute commands and verify sync status.
-- **Local Caching**: Safe offline reading and fast startup utilizing local cache JSON models.
+## Features
 
----
+- **Multi-Provider Support** — Monitor Anthropic, OpenAI, OpenRouter, Groq, Ollama, and more
+- **Real-Time Quota Tracking** — Live usage and rate limit data with configurable polling
+- **Cost Analytics** — Per-provider and aggregate spend breakdowns with model-level detail
+- **Secure Credential Storage** — API keys and browser cookie import
+- **Browser Profile Import** — Pull authentication cookies from Chrome, Firefox, and Edge profiles
+- **Dark / Light Themes** — macOS-inspired glassmorphic UI with smooth transitions
+- **System Tray** — Runs quietly in the background; click to show/hide
+- **Collapsible CLI Terminal** — Run arbitrary CodexBar commands directly from the app
+- **Cross-Platform** — Linux, Windows, and macOS via Tauri 2
 
-## 🚀 Installation
+## Tech Stack
 
-### 🐧 Linux Installation
+- **Frontend** — Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4
+- **Backend** — Rust (Axum HTTP API, CodexBar CLI integration)
+- **Desktop Runtime** — Tauri 2 (system tray, window management, process lifecycle)
 
-You can install and run TokenTracker on Linux using a simple terminal command.
+## Architecture
 
-#### Option 1: Standalone AppImage (Recommended)
-Download and execute the portable executable:
-```bash
-curl -LO https://github.com/ayan-de/Token-Tracker/releases/latest/download/TokenTracker.AppImage
-chmod +x TokenTracker.AppImage
-./TokenTracker.AppImage
+```
+CodexBar CLI (codexbar usage/cost --json)
+  → Rust Backend: parses output, merges with cache, persists to ~/.codexbar-desktop/
+  → Tauri event: "data-synced" payload emitted to frontend
+  → React: useProviders hook subscribes and manages all state
+  → Components: mapProviderUsage / mapProviderCost transform raw JSON → typed objects
 ```
 
-#### Option 2: Debian/Ubuntu package (.deb)
-Download and install the Debian archive:
-```bash
-curl -LO https://github.com/ayan-de/Token-Tracker/releases/latest/download/TokenTracker.deb
-sudo dpkg -i TokenTracker.deb
-```
+### Key Files
 
----
+| Path | Purpose |
+|------|---------|
+| `backend/src/main.rs` | Rust HTTP server entry point |
+| `backend/src/server/` | Axum router and request handlers |
+| `src-tauri/src/lib.rs` | Tauri app lifecycle, tray icon, window management |
+| `src-tauri/src/backend.rs` | Backend process spawning, health check, lifecycle |
+| `src/lib/apiClient.ts` | Frontend HTTP client (fetches port dynamically from Tauri) |
+| `src/hooks/useProviders.ts` | Central hook owning all provider/cost/settings state |
+| `src/lib/dataMapping.ts` | CLI JSON → typed object transformers + provider descriptors |
 
-### 🪟 Windows Installation
-
-1. Navigate to the [TokenTracker Releases](https://github.com/ayan-de/Token-Tracker/releases) page.
-2. Download the installer file corresponding to your architecture (e.g., `TokenTracker_x64_en-US.msi` or the portable `TokenTracker.exe`).
-3. Double-click the downloaded file and follow the onscreen setup wizard.
-
-*Note: Make sure to install the CodexBar CLI executable on Windows (by adding it to your `%PATH%` environment variable) to allow TokenTracker to detect your active providers.*
-
----
-
-## 💾 Local Caching & Directory Structures
-
-TokenTracker caches provider usage states and cost metrics locally to guarantee instantaneous startup times.
-
-- **Linux Cache Directory**: `~/.codexbar-desktop/cache.json`
-- **Windows Cache Directory**: `%USERPROFILE%\.codexbar-desktop\cache.json`
-
-You can inspect these files to verify the raw JSON payloads received from the background CLI queries.
-
----
-
-## 🛠️ Development & Building
+## Getting Started
 
 ### Prerequisites
-- Node.js (LTS recommended)
-- Rust & Cargo (latest stable version)
-- System dependencies (Linux WebKitGTK and build-essential packages)
 
-### Commands
+- [Rust](https://rustup.rs/) (latest stable)
+- [Node.js](https://nodejs.org/) 20+
+- CodexBar CLI — install from [releases](https://github.com/opencode-ai/codexbar) or `cargo install codexbar`
+
+### Development
+
 ```bash
 # Install frontend dependencies
 npm install
 
-# Run frontend in development mode
+# Run the full Tauri app (frontend + bundled backend, hot-reload)
+npm run tauri:dev
+```
+
+The backend HTTP server starts automatically. The frontend connects via a port dynamically reported by Tauri (default `46727`).
+
+### Production Build
+
+```bash
+npm run tauri:build
+```
+
+Outputs native installers for your platform (AppImage, `.deb`, `.msi`, etc.).
+
+### Running Tests
+
+```bash
+# Terminal 1 — start the dev server
 npm run dev
 
-# Run Tauri desktop app in hot-reload development mode
-npm run tauri:dev
-
-# Build native production installers (AppImage, deb, msi, etc.)
-npm run build
-npx tauri build
+# Terminal 2 — run smoke tests
+npm run test:smoke
 ```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TOKEN_TRACKER_BACKEND_PORT` | `46727` | Port for the bundled Rust backend HTTP server |
+
+## Local Caching
+
+Usage and cost data is cached locally for offline reading and fast startup:
+
+- **Linux** — `~/.codexbar-desktop/cache.json`
+- **Windows** — `%USERPROFILE%\.codexbar-desktop\cache.json`
+
+## License
+
+MIT
