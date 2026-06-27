@@ -12,6 +12,7 @@ pub mod notifications;
 
 
 
+use std::env;
 use std::net::SocketAddr;
 
 #[tokio::main]
@@ -22,11 +23,17 @@ async fn main() {
     // Create our Axum application router from server module
     let app = server::create_router();
 
-    // Bind to localhost port 46727
-    let addr = SocketAddr::from(([127, 0, 0, 1], 46727));
+    // Port from env var or default to 46727
+    let port: u16 = env::var("TOKEN_TRACKER_BACKEND_PORT")
+        .unwrap_or_else(|_| "46727".to_string())
+        .parse()
+        .unwrap_or(46727);
+
+    // Bind to localhost
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     println!("Backend server starting up...");
     println!("Listening on: http://{}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
