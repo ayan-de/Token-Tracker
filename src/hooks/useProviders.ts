@@ -177,11 +177,23 @@ export function useProviders(): UseProvidersReturn {
     }
   }, [refetchCredentials, refreshData]);
 
-  // Initial load
+  // Initial load with timeout
   useEffect(() => {
-    syncData().then(() => {
-      refreshData();
-    });
+    const timeout = setTimeout(() => {
+      setBackendStatus((prev) => {
+        if (prev.status === "connecting") {
+          setError("Backend is taking too long to respond. Please check if the backend is running.");
+          return { status: "error" };
+        }
+        return prev;
+      });
+    }, 15000);
+
+    syncData()
+      .then(() => refreshData())
+      .catch((err) => setError(`Failed to connect to backend: ${err}`))
+      .finally(() => clearTimeout(timeout));
+
     refetchSettings();
     refetchCredentials();
     refetchBrowsers();
