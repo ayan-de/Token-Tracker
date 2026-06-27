@@ -1,7 +1,7 @@
 # TokenTracker
 
 
-TokenTracker is a cross-platform desktop application that monitors AI provider quotas, rate limits, and spend statistics in real-time. It wraps the [CodexBar CLI](https://github.com/opencode-ai/codexbar) and presents data in a clean, macOS-inspired popover with glassmorphic design and dark/light theme support.
+TokenTracker is a cross-platform desktop application that monitors AI provider quotas, rate limits, and spend statistics in real-time.
 
 | | |
 |:---:|:---:|
