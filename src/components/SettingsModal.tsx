@@ -372,7 +372,7 @@ export default function SettingsModal({
                                 setCredExtraFields({});
                               }
                             }}
-                            className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-lg text-white transition-colors cursor-pointer border-0"
+                            className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-sm text-white transition-colors cursor-pointer border-0"
                           >
                             Add
                           </button>
@@ -397,7 +397,7 @@ export default function SettingsModal({
                             setCredSecret("");
                           }
                         }}
-                        className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-lg text-white transition-colors cursor-pointer border-0"
+                        className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-sm text-white transition-colors cursor-pointer border-0"
                       >
                         Add
                       </button>
@@ -486,7 +486,7 @@ export default function SettingsModal({
         <div className="border-t border-border-subtle pt-2.5">
           <button
             onClick={onClose}
-            className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors cursor-pointer"
+            className="w-full py-1.5 bg-accent-blue hover:bg-hover-subtle text-xs font-semibold rounded-sm text-white border border-border-subtle transition-colors cursor-pointer"
           >
             Close
           </button>
