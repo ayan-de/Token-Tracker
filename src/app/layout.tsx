@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import RootErrorBoundary from "@/components/RootErrorBoundary";
 
 export const metadata: Metadata = {
   title: "TokenTracker",
@@ -21,7 +22,9 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <RootErrorBoundary>{children}</RootErrorBoundary>
+      </body>
     </html>
   );
 }
