@@ -2,63 +2,55 @@
 
 import { memo, useState, useMemo, useCallback } from "react";
 import type { ProviderUsage, NamedRateWindow } from "@/lib/types";
-import { providerLogo, PROVIDER_DESCRIPTORS } from "@/lib/dataMapping";
+import { providerLogo } from "@/lib/dataMapping";
 import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
 import ProviderSubTabBar, { type SubTab } from "./ProviderSubTabBar";
+import OpenCodeDBHistory from "./OpenCodeDBHistory";
 import { useTheme } from "@/app/page";
 
 interface OpenCodeDetailProps {
   provider: ProviderUsage;
 }
 
+/** Returns true if the window ID is an OpenCode DB tracked history window */
+function isDbWindow(windowId: string): boolean {
+  return windowId.startsWith("opencode-db-");
+}
+
+/** Extract provider ID from DB window ID:
+ * "opencode-db-{provider}-{idx}" → provider
+ * "opencode-db-summary-{provider}" → provider
+ */
+function dbWindowProviderId(windowId: string): string | null {
+  if (!isDbWindow(windowId)) return null;
+  const rest = windowId.slice("opencode-db-".length);
+  if (rest.startsWith("summary-")) return rest.slice("summary-".length);
+  const lastDash = rest.lastIndexOf("-");
+  return lastDash === -1 ? null : rest.slice(0, lastDash);
+}
+
+/** Extract sub-tab ID from a real-time extraRateWindow ID.
+ * Only handles real-time windows; DB windows are handled separately.
+ */
+function extractSubTabId(windowId: string): { tabId: string; tabLabel: string } | null {
+  if (!windowId.startsWith("opencode-")) return null;
+  // Skip DB windows — handled by OpenCodeDBHistory
+  if (isDbWindow(windowId)) return null;
+
+  const rest = windowId.slice("opencode-".length);
+  const firstDash = rest.indexOf("-");
+  const serviceId = firstDash === -1 ? rest : rest.slice(0, firstDash);
+  return { tabId: serviceId, tabLabel: serviceId.charAt(0).toUpperCase() + serviceId.slice(1) };
+}
+
 interface SubTabData {
   id: string;
   label: string;
-  /** Windows from the provider's API (real-time) */
   realTimeWindows: NamedRateWindow[];
-  /** Windows from OpenCode's local DB (historical) */
-  dbWindows: NamedRateWindow[];
-}
-
-/** Extract sub-tab ID from an extraRateWindow ID.
- * Window ID formats:
- * - "opencode-{service_id}"             → tabId = service_id (real-time primary)
- * - "opencode-{service_id}-weekly"      → tabId = service_id (real-time secondary)
- * - "opencode-{service_id}-model"       → tabId = service_id (real-time model-specific)
- * - "opencode-db-{provider_id}-{idx}"   → tabId = provider_id (DB model row)
- * - "opencode-db-summary-{provider_id}" → tabId = provider_id (DB provider total)
- * - other → null (not a sub-tab window)
- */
-function extractSubTabId(windowId: string): { tabId: string; tabLabel: string; isDb: boolean } | null {
-  if (!windowId.startsWith("opencode-")) return null;
-
-  const rest = windowId.slice("opencode-".length);
-
-  // DB windows: opencode-db-{provider_id}-... or opencode-db-summary-{provider_id}
-  if (rest.startsWith("db-summary-")) {
-    const provider = rest.slice("db-summary-".length);
-    return { tabId: provider, tabLabel: provider.charAt(0).toUpperCase() + provider.slice(1), isDb: true };
-  }
-  if (rest.startsWith("db-")) {
-    // opencode-db-{provider_id}-{idx}
-    const dbRest = rest.slice("db-".length);
-    // provider_id is the prefix before the first '-' that separates it from the numeric idx
-    const firstDash = dbRest.indexOf("-");
-    if (firstDash === -1) return null;
-    const provider = dbRest.slice(0, firstDash);
-    return { tabId: provider, tabLabel: provider.charAt(0).toUpperCase() + provider.slice(1), isDb: true };
-  }
-
-  // Real-time windows: opencode-{service_id}...
-  // tabId = first segment (e.g. "minimax" from "opencode-minimax" or "opencode-minimax-weekly")
-  const firstDash = rest.indexOf("-");
-  const serviceId = firstDash === -1 ? rest : rest.slice(0, firstDash);
-  return { tabId: serviceId, tabLabel: serviceId.charAt(0).toUpperCase() + serviceId.slice(1), isDb: false };
 }
 
 /** Derive the primary usedPercent for a tab from its real-time windows */
 function tabUsedPercent(windows: NamedRateWindow[]): number | undefined {
-  // Use the first window with a valid usedPercent
   for (const w of windows) {
     if (w.window.usedPercent > 0) return w.window.usedPercent;
   }
@@ -69,12 +61,17 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
   const { theme } = useTheme();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
 
-  // Build sub-tab data from extraRateWindows
-  const { tabs, subTabMap } = useMemo(() => {
+  // Build sub-tab data and separate DB windows
+  const { tabs, subTabMap, dbWindows } = useMemo(() => {
     const windows = provider.usage?.extraRateWindows || [];
     const tabMap = new Map<string, SubTabData>();
+    const db: NamedRateWindow[] = [];
 
     for (const w of windows) {
+      if (isDbWindow(w.id)) {
+        db.push(w);
+        continue;
+      }
       const parsed = extractSubTabId(w.id);
       if (!parsed) continue;
 
@@ -83,16 +80,10 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
           id: parsed.tabId,
           label: parsed.tabLabel,
           realTimeWindows: [],
-          dbWindows: [],
         });
       }
 
-      const entry = tabMap.get(parsed.tabId)!;
-      if (parsed.isDb) {
-        entry.dbWindows.push(w);
-      } else {
-        entry.realTimeWindows.push(w);
-      }
+      tabMap.get(parsed.tabId)!.realTimeWindows.push(w);
     }
 
     const tabs: SubTab[] = Array.from(tabMap.values())
@@ -103,7 +94,7 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
 
-    return { tabs, subTabMap: tabMap };
+    return { tabs, subTabMap: tabMap, dbWindows: db };
   }, [provider.usage?.extraRateWindows]);
 
   // Auto-select first tab
@@ -115,6 +106,12 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
   }, []);
 
   const activeTab = activeTabId ? subTabMap.get(activeTabId) : null;
+
+  // DB windows filtered to only the active tab's provider
+  const activeTabDbWindows = useMemo(() => {
+    if (!activeTabId) return [];
+    return dbWindows.filter((w) => dbWindowProviderId(w.id) === activeTabId);
+  }, [dbWindows, activeTabId]);
 
   // Count total provider windows (for badge)
   const providerCount = tabs.length;
@@ -206,20 +203,15 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
               </div>
             )}
 
-            {/* OpenCode local DB tracked history */}
-            {activeTab.dbWindows.length > 0 && (
+            {/* OpenCode local DB tracked history — scoped to active tab's provider */}
+            {activeTabDbWindows.length > 0 && (
               <div>
-                <h3 className="text-[11px] font-semibold text-text-muted/80 uppercase tracking-wider mb-1">
-                  OpenCode Tracked History
-                </h3>
-                <div className="space-y-0">
-                  {activeTab.dbWindows.map(renderWindowRow)}
-                </div>
+                <OpenCodeDBHistory windows={activeTabDbWindows} />
               </div>
             )}
 
             {/* No real-time data — prompt to configure */}
-            {activeTab.realTimeWindows.length === 0 && activeTab.dbWindows.length === 0 && (
+            {activeTab.realTimeWindows.length === 0 && (
               <div className="py-8 flex flex-col items-center justify-center text-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-text-muted/40 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
