@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+pub mod provider_factory;
 pub mod abacus;
 pub mod alibaba;
 pub mod alibabatokenplan;
@@ -24,6 +25,7 @@ pub mod devin;
 pub mod doubao;
 pub mod elevenlabs;
 pub mod factory;
+pub mod freemodel;
 pub mod gemini;
 pub mod grok;
 pub mod groq;
@@ -81,6 +83,7 @@ pub use devin::DevinProvider;
 pub use doubao::DoubaoProvider;
 pub use elevenlabs::ElevenLabsProvider;
 pub use factory::FactoryProvider;
+pub use freemodel::FreeModelProvider;
 pub use gemini::GeminiProvider;
 pub use grok::GrokProvider;
 pub use groq::GroqProvider;

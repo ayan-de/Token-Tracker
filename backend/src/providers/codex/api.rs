@@ -2,6 +2,7 @@
 //!
 //! Uses OAuth tokens stored by the Codex CLI in ~/.codex/auth.json
 
+use base64::Engine;
 use crate::core::{CostSnapshot, NamedRateWindow, ProviderError, RateWindow, UsageSnapshot};
 use chrono::{DateTime, TimeZone, Utc};
 use serde::Deserialize;
@@ -83,7 +84,7 @@ impl CodexApi {
             .await
             .map_err(|e| ProviderError::Parse(e.to_string()))?;
 
-        let (mut usage, cost) = self.build_result_from_json(&json)?;
+        let (mut usage, cost) = self.build_result_from_json(&json, creds.email.clone())?;
         if let Ok(reset_credits) = self.fetch_rate_limit_reset_credits(&creds, &base_url).await
             && reset_credits.available_count > 0
         {
@@ -165,6 +166,7 @@ impl CodexApi {
                 return Ok(CodexCredentials {
                     access_token: trimmed.to_string(),
                     account_id: None,
+                    email: None,
                 });
             }
         }
@@ -189,9 +191,15 @@ impl CodexApi {
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
 
+        let email = tokens
+            .get("id_token")
+            .and_then(|v| v.as_str())
+            .and_then(|jwt| decode_jwt_email(jwt));
+
         Ok(CodexCredentials {
             access_token,
             account_id,
+            email,
         })
     }
 
@@ -277,6 +285,7 @@ impl CodexApi {
     fn build_result_from_json(
         &self,
         json: &serde_json::Value,
+        email: Option<String>,
     ) -> Result<(UsageSnapshot, Option<CostSnapshot>), ProviderError> {
         // Extract plan type
         let plan_type = json
@@ -322,6 +331,9 @@ impl CodexApi {
         }
         if let Some(method) = login_method {
             usage = usage.with_login_method(method);
+        }
+        if let Some(e) = email {
+            usage = usage.with_email(e);
         }
 
         // Extract credits if present
@@ -600,6 +612,7 @@ impl Default for CodexApi {
 struct CodexCredentials {
     access_token: String,
     account_id: Option<String>,
+    email: Option<String>,
 }
 
 struct CachedCodexCredentials {
@@ -756,6 +769,23 @@ fn format_reset_countdown(reset_at: Option<DateTime<Utc>>) -> Option<String> {
     }
 }
 
+fn decode_jwt_email(jwt: &str) -> Option<String> {
+    let parts: Vec<&str> = jwt.split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let payload = parts[1];
+    // JWT padding is optional, add padding if needed
+    let padded = match payload.len() % 4 {
+        2 => format!("{}==", payload),
+        3 => format!("{}=", payload),
+        _ => payload.to_string(),
+    };
+    let decoded = base64::engine::general_purpose::STANDARD.decode(&padded).ok()?;
+    let json: serde_json::Value = serde_json::from_slice(&decoded).ok()?;
+    json.get("email").and_then(|v| v.as_str()).map(String::from)
+}
+
 fn parse_chatgpt_base_url(config_content: &str) -> Option<String> {
     for line in config_content.lines() {
         // Skip comments
@@ -868,7 +898,7 @@ mod tests {
                         }
                     }
                 ]
-            }))
+            }), None)
             .expect("codex usage");
 
         assert_eq!(usage.extra_rate_windows.len(), 2);
@@ -895,7 +925,7 @@ mod tests {
                         "rate_limit": { "primary_window": {} }
                     }
                 ]
-            }))
+            }), None)
             .expect("codex usage");
 
         assert!(usage.extra_rate_windows.is_empty());

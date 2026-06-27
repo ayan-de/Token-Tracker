@@ -20,16 +20,8 @@ use crate::providers::minimax::MiniMaxProvider;
 
 // --- Cache Helpers ---
 
-fn get_home_dir() -> Option<PathBuf> {
-    dirs::home_dir()
-}
-
 fn get_cache_path() -> Option<PathBuf> {
-    let home = get_home_dir()?;
-    Some(
-        home.join(".codexbar-desktop")
-            .join("cache.json"),
-    )
+    Some(dirs::config_dir()?.join("CodexBar").join("cache.json"))
 }
 
 fn read_cache() -> Option<serde_json::Value> {

@@ -1,4 +1,4 @@
-import type { ProviderUsage, CostItem, RawCliUsageItem, RawCliCostItem, ProviderUsageDetails, PacingStage } from "./types";
+import type { ProviderUsage, CostItem, ProviderUsageDetails, PacingStage } from "./types";
 
 export interface ProviderDescriptor {
   displayName: string;
@@ -36,8 +36,11 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
   opencode:   { displayName: "OpenCode",   logo: "/logos/opencode.svg",                          sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   opencodego: { displayName: "OpenCode Go",logo: "/logos/opencode.svg",      sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   factory:    { displayName: "Factory",    logo: "",                          sessionLabel: "Standard", weeklyLabel: "Premium" },
+  freemodel: { displayName: "FreeModel",  logo: "/logos/freemodel.svg",   sessionLabel: "Session", weeklyLabel: "Weekly", importable: true, credentialFields: {
+    bm_session: { key: 'bm_session', label: 'Session Cookie (bm_session)', placeholder: 'bm_session=...', type: 'password', required: true },
+  }},
   copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat", importable: true },
-  zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
+  zai:        { displayName: "z.ai",        logo: "/logos/zai-light.svg", logoDark: "/logos/zai-dark.svg", sessionLabel: "Tokens", weeklyLabel: "MCP" },
   minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly", importable: true, credentialFields: {
     api_key:   { key: 'api_key',   label: 'API Key',    placeholder: 'sk-cp-...',      type: 'password', required: true },
     group_id: { key: 'group_id', label: 'Group ID',  placeholder: 'Your Group ID',  type: 'text',      required: true },
@@ -77,7 +80,7 @@ export function providerLogo(provider: string, theme: 'dark' | 'light' = 'dark')
   return desc.logo || "";
 }
 
-export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {
+export function mapProviderUsage(raw: any): ProviderUsage | null {
   const provider = raw.provider || "unknown";
   const errorMessage = raw.error?.message || "Usage is temporarily unavailable.";
   const hasUsage = Boolean(raw.usage);
@@ -164,7 +167,7 @@ export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {
       unit: usageRaw.tertiary.unit ?? "requests",
       pacing: usageRaw.tertiary.pacing ? { stage: usageRaw.tertiary.pacing.stage as PacingStage } : null,
     } : null,
-    extraRateWindows: usageRaw.extraRateWindows ? usageRaw.extraRateWindows.map((ew) => ({
+    extraRateWindows: usageRaw.extraRateWindows ? usageRaw.extraRateWindows.map((ew: any) => ({
       id: ew.id,
       title: ew.title,
       window: {
@@ -185,7 +188,7 @@ export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {
       updatedAt: usageRaw.providerCost.updatedAt,
     } : null,
     loginMethod: usageRaw.loginMethod,
-    accountEmail: usageRaw.accountEmail,
+    accountEmail: usageRaw.usage?.accountEmail ?? usageRaw.accountEmail,
     updatedAt: usageRaw.updatedAt,
     identity: usageRaw.identity ? {
       providerID: usageRaw.identity.providerID,
@@ -206,7 +209,7 @@ export function mapCLIUsage(raw: RawCliUsageItem): ProviderUsage | null {
   };
 }
 
-export function mapCLICost(raw: RawCliCostItem): CostItem {
+export function mapProviderCost(raw: any): CostItem {
   const provider = raw.provider || "unknown";
   const totalCostUSD = raw.sessionCostUSD || 0;
   const last30DaysCostUSD =

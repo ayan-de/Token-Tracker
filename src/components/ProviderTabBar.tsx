@@ -28,22 +28,27 @@ const ProviderTab = memo(function ProviderTab({
   return (
     <button
       onClick={() => onSelect(p.provider)}
-      className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-semibold whitespace-nowrap cursor-pointer border-0 outline-none focus:outline-none shrink-0 ${
+      className={`flex flex-col items-center justify-center gap-1.5 px-3 py-2 rounded-sm text-[10px] font-semibold whitespace-nowrap cursor-pointer border-0 outline-none focus:outline-none flex-none ${
         isSelected
           ? `text-white shadow-lg shadow-[#3b82f6]/25`
           : "bg-transparent text-text-muted hover:text-text-main hover:bg-hover-subtle"
       }`}
       style={isSelected ? { backgroundColor: '#3b82f6' } : undefined}
     >
-      {providerLogo(p.provider, theme) ? (
-        <img
-          src={providerLogo(p.provider, theme)}
-          alt=""
-          className={`w-5 h-5 object-contain ${isSelected ? 'opacity-100' : 'opacity-80'}`}
-        />
-      ) : (
-        <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)}`} />
-      )}
+      <div className="relative flex items-center justify-center w-7 h-7">
+        {isSelected && (
+          <div className="absolute inset-0 rounded-full bg-white" style={{ boxShadow: '0 0 10px 3px rgba(255, 255, 255, 0.4), 0 0 25px 8px rgba(255, 255, 255, 0.3), 0 0 50px 15px rgba(255, 255, 255, 0.2), 0 0 100px 30px rgba(255, 255, 255, 0.1)' }} />
+        )}
+        {providerLogo(p.provider, theme) ? (
+          <img
+            src={providerLogo(p.provider, theme)}
+            alt=""
+            className={`w-5 h-5 object-contain relative z-10 ${isSelected ? 'opacity-100' : 'opacity-80'}`}
+          />
+        ) : (
+          <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getProviderGradient(p.provider)} relative z-10`} />
+        )}
+      </div>
       <span>{desc.displayName}</span>
 
       {/* Progress bar under the tab (only if NOT selected to match the design) */}

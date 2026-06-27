@@ -63,11 +63,13 @@ const LOGO_GRADIENTS: Partial<Record<string, string>> = {
   copilot: "from-[#9439d0] to-[#762ea6]",
   cursor: "from-[#c1d039] to-[#9aa62e]",
   deepseek: "from-[#4d6bfe] to-[#3e56cb]",
+  freemodel: "from-[#19c37d] to-[#0f9c62]",
   gemini: "from-[#9168c0] to-[#74539a]",
   minimax: "from-[#e73562] to-[#b92a4e]",
   mistral: "from-[#ffaf00] to-[#cc8c00]",
   ollama: "from-[#d0395c] to-[#a62e4a]",
   openai: "from-[#b7d039] to-[#92a62e]",
+  opencode: "from-[#CFCECD] to-[#211E1E]",
   openrouter: "from-[#d09139] to-[#a6742e]",
   windsurf: "from-[#d03970] to-[#a62e5a]",
 };

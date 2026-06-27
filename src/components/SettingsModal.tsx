@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PROVIDER_DESCRIPTORS, providerLogo, CredentialField } from "@/lib/dataMapping";
-import { Trash2 } from "@/lib/icons";
+import { Trash2, Check } from "@/lib/icons";
 import { useTheme } from "@/app/page";
 
 interface SettingsModalProps {
@@ -35,6 +35,16 @@ export default function SettingsModal({
   const [credProvider, setCredProvider] = useState<string>("claude");
   const [credType, setCredType] = useState<'key' | 'cookie'>('key');
   const [credSecret, setCredSecret] = useState<string>("");
+
+  // Auto-select cookie type for cookie-only providers (no api_key field)
+  useEffect(() => {
+    const desc = PROVIDER_DESCRIPTORS[credProvider];
+    const fields = desc?.credentialFields;
+    const hasApiKey = fields ? Object.values(fields as unknown as CredentialField[]).some(f => f.key === 'api_key') : false;
+    if (!hasApiKey) {
+      setCredType('cookie');
+    }
+  }, [credProvider]);
   const [credExtraFields, setCredExtraFields] = useState<Record<string, string>>({});
   const [importBrowserId, setImportBrowserId] = useState<string>("");
   const [importProfileId, setImportProfileId] = useState<string>("");
@@ -214,7 +224,7 @@ export default function SettingsModal({
                 {Object.entries(PROVIDER_DESCRIPTORS).map(([id, desc]) => {
                   const isEnabled = settings?.enabled_providers?.includes(id) ?? false;
                   return (
-                    <label key={id} className="flex items-center gap-2 p-2 rounded-lg bg-primary/20 border border-border-subtle hover:border-hover-subtle transition-all cursor-pointer">
+                    <label key={id} className="flex items-center gap-2 p-2 rounded-sm bg-primary/20 border border-border-subtle hover:border-hover-subtle transition-all cursor-pointer">
                       <input
                         type="checkbox"
                         checked={isEnabled}
@@ -229,19 +239,21 @@ export default function SettingsModal({
                             await onUpdateSettings({ ...settings, enabled_providers: updatedEnabled });
                           }
                         }}
-                        className="rounded border-border-subtle bg-primary accent-accent-blue focus:ring-0 w-3.5 h-3.5"
+                        className="rounded border-border-subtle bg-primary accent-accent-blue focus:ring-0 w-3 h-3"
                       />
                       {providerLogo(id, theme) ? (
                         <img src={providerLogo(id, theme)} alt="" className="w-3.5 h-3.5 object-contain" />
                       ) : (
                         <div className="w-1.5 h-1.5 rounded-full bg-accent-blue" />
                       )}
-                      <span className="text-[11px] font-medium text-text-main truncate">
-                        {desc.displayName}
+                      <div className="flex items-center justify-between flex-1 min-w-0">
+                        <span className="text-[11px] font-medium text-text-main truncate">
+                          {desc.displayName}
+                        </span>
                         {installedProviders.includes(id) && (
-                          <span className="text-text-muted font-normal"> (installed)</span>
+                          <Check className="w-3 h-3 text-accent-blue flex-shrink-0" />
                         )}
-                      </span>
+                      </div>
                     </label>
                   );
                 })}
@@ -296,6 +308,10 @@ export default function SettingsModal({
                   {(() => {
                     const desc = PROVIDER_DESCRIPTORS[credProvider];
                     if (desc?.credentialFields) {
+                      const fieldEntries = Object.values(desc.credentialFields) as CredentialField[];
+                      const hasApiKey = fieldEntries.some(f => f.key === 'api_key');
+                      // If no api_key field, it's cookie-only — skip type dropdown
+                      if (!hasApiKey) return null;
                       return (
                         <select
                           value={credType}
@@ -316,8 +332,9 @@ export default function SettingsModal({
                   const fields = desc?.credentialFields;
                   if (fields && credType === 'key') {
                     const fieldEntries = Object.values(fields) as CredentialField[];
-                    // Separate the api_key field (uses credSecret) from extra fields (group_id, etc.)
                     const apiKeyField = fieldEntries.find(f => f.key === 'api_key');
+                    // If no api_key field, show nothing for key branch
+                    if (!apiKeyField) return null;
                     const extraFields = fieldEntries.filter(f => f.key !== 'api_key');
                     return (
                       <>
@@ -355,7 +372,7 @@ export default function SettingsModal({
                                 setCredExtraFields({});
                               }
                             }}
-                            className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-lg text-white transition-colors cursor-pointer border-0"
+                            className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-sm text-white transition-colors cursor-pointer border-0"
                           >
                             Add
                           </button>
@@ -380,7 +397,7 @@ export default function SettingsModal({
                             setCredSecret("");
                           }
                         }}
-                        className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-lg text-white transition-colors cursor-pointer border-0"
+                        className="px-3 bg-accent-blue hover:bg-hover-subtle hover:text-text-main text-xs font-semibold rounded-sm text-white transition-colors cursor-pointer border-0"
                       >
                         Add
                       </button>
@@ -469,7 +486,7 @@ export default function SettingsModal({
         <div className="border-t border-border-subtle pt-2.5">
           <button
             onClick={onClose}
-            className="w-full py-1.5 bg-bg-subtle hover:bg-hover-subtle text-xs font-semibold rounded-lg text-text-main border border-border-subtle transition-colors cursor-pointer"
+            className="w-full py-1.5 bg-accent-blue hover:bg-hover-subtle text-xs font-semibold rounded-sm text-white border border-border-subtle transition-colors cursor-pointer"
           >
             Close
           </button>

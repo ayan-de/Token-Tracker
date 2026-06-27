@@ -1,33 +1,63 @@
 //! OpenCode provider implementation
 //!
-//! Fetches usage data from OpenCode (opencode.ai)
-//! Uses browser cookies for authentication
-
-pub mod scraper;
-
-// Re-exports for advanced scraping
-#[allow(unused_imports)]
-pub use scraper::{OpenCodeError, OpenCodeUsageFetcher, OpenCodeUsageSnapshot};
+//! OpenCode (opencode.ai) is an AI proxy aggregator with a bring-your-own-key model.
+//! It stores API keys for external providers in ~/.local/share/opencode/auth.json.
+//!
+//! This provider is fully dynamic — it reads auth.json, maps each service ID to a
+//! CodexBar ProviderId (via ProviderId::from_str), instantiates the provider via
+//! the factory, and calls fetch_usage with the API key from auth.json.
+//!
+//! Also queries OpenCode's local SQLite DB for historical per-model stats.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use reqwest::Client;
-use serde_json::Value;
-use uuid::Uuid;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use tracing;
 
 use crate::core::{
     FetchContext, Provider, ProviderError, ProviderFetchResult, ProviderId, ProviderMetadata,
     RateWindow, SourceMode, UsageSnapshot,
 };
+use crate::providers::provider_factory::create_provider;
 
-const BASE_URL: &str = "https://opencode.ai";
-const SERVER_URL: &str = "https://opencode.ai/_server";
-const WORKSPACES_SERVER_ID: &str =
-    "def39973159c7f0483d8793a822b8dbb10d067e12c65455fcb4608459ba0234f";
-const SUBSCRIPTION_SERVER_ID: &str =
-    "7abeebee372f304e050aaaf92be863f4a86490e382f8c79db68fd94040d691b4";
+/// OpenCode auth.json entry
+#[derive(Debug, Deserialize)]
+struct AuthEntry {
+    #[serde(rename = "type")]
+    entry_type: String,
+    key: String,
+}
 
-/// OpenCode provider
+/// OpenCode auth.json root
+#[derive(Debug, Deserialize)]
+struct AuthJson(HashMap<String, AuthEntry>);
+
+/// OpenCode local DB session stats (per-model)
+#[derive(Debug, Clone)]
+struct OpenCodeModelStats {
+    model_id: String,
+    sessions: i64,
+    total_input: i64,
+    total_output: i64,
+    total_cache_read: i64,
+    total_cache_write: i64,
+    total_cost_dollars: f64,
+}
+
+/// OpenCode local DB aggregated stats per provider
+#[derive(Debug, Clone)]
+struct OpenCodeProviderStats {
+    provider_id: String,
+    models: Vec<OpenCodeModelStats>,
+    total_sessions: i64,
+    total_tokens: i64,
+    total_cost_dollars: f64,
+}
+
+/// OpenCode provider — dynamically delegates to sub-providers based on auth.json
 pub struct OpenCodeProvider {
     metadata: ProviderMetadata,
     client: Client,
@@ -48,434 +78,191 @@ impl OpenCodeProvider {
                 dashboard_url: Some("https://opencode.ai"),
                 status_page_url: None,
             },
-            client: crate::core::credentialed_http_client_builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .build()
-                .unwrap_or_else(|_| Client::new()),
+            client: Client::new(),
         }
     }
 
-    /// Fetch usage with cookie header
-    async fn fetch_with_cookies(
-        &self,
-        cookie_header: &str,
-    ) -> Result<UsageSnapshot, ProviderError> {
-        // First get workspace ID
-        let workspace_id = self.fetch_workspace_id(cookie_header).await?;
-
-        // Then fetch subscription info
-        let subscription = self
-            .fetch_subscription(&workspace_id, cookie_header)
-            .await?;
-
-        // Parse the response
-        self.parse_subscription(&subscription)
+    /// Get OpenCode config directory
+    fn opencode_dir() -> Option<PathBuf> {
+        dirs::home_dir().map(|p| p.join(".local/share/opencode"))
     }
 
-    /// Fetch workspace ID from server
-    async fn fetch_workspace_id(&self, cookie_header: &str) -> Result<String, ProviderError> {
-        let url = format!("{}?id={}", SERVER_URL, WORKSPACES_SERVER_ID);
+    /// Read auth.json from OpenCode config directory
+    fn read_auth_json() -> Result<AuthJson, ProviderError> {
+        let path = Self::opencode_dir()
+            .ok_or_else(|| ProviderError::Other("Could not find OpenCode config directory".to_string()))?
+            .join("auth.json");
 
-        let response = self
-            .client
-            .get(&url)
-            .header("Cookie", cookie_header)
-            .header("X-Server-Id", WORKSPACES_SERVER_ID)
-            .header("X-Server-Instance", format!("server-fn:{}", Uuid::new_v4()))
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
-            .header("Origin", BASE_URL)
-            .header("Referer", BASE_URL)
-            .header(
-                "Accept",
-                "text/javascript, application/json;q=0.9, */*;q=0.8",
-            )
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            if response.status().as_u16() == 401 || response.status().as_u16() == 403 {
-                return Err(ProviderError::AuthRequired);
-            }
-            return Err(ProviderError::Other(format!(
-                "OpenCode API returned {}",
-                response.status()
-            )));
+        if !path.exists() {
+            return Err(ProviderError::NotInstalled(
+                "OpenCode auth.json not found. Is OpenCode installed?".to_string(),
+            ));
         }
 
-        let text = response.text().await?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| ProviderError::Other(format!("Failed to read auth.json: {}", e)))?;
 
-        // Check for sign-out indicators
-        if self.looks_signed_out(&text) {
-            return Err(ProviderError::AuthRequired);
-        }
-
-        // Parse workspace IDs
-        let ids = self.parse_workspace_ids(&text);
-        if ids.is_empty() {
-            return Err(ProviderError::Parse("No workspace ID found".to_string()));
-        }
-
-        Ok(ids[0].clone())
+        serde_json::from_str(&content)
+            .map_err(|e| ProviderError::Parse(format!("Failed to parse auth.json: {}", e)))
     }
 
-    /// Fetch subscription info for a workspace
-    async fn fetch_subscription(
-        &self,
-        workspace_id: &str,
-        cookie_header: &str,
-    ) -> Result<String, ProviderError> {
-        let referer = format!("https://opencode.ai/workspace/{}/billing", workspace_id);
-        let args = serde_json::json!([workspace_id]);
-        let encoded_args = Self::url_encode(&args.to_string());
-        let url = format!(
-            "{}?id={}&args={}",
-            SERVER_URL, SUBSCRIPTION_SERVER_ID, encoded_args
-        );
-
-        let response = self
-            .client
-            .get(&url)
-            .header("Cookie", cookie_header)
-            .header("X-Server-Id", SUBSCRIPTION_SERVER_ID)
-            .header("X-Server-Instance", format!("server-fn:{}", Uuid::new_v4()))
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            )
-            .header("Origin", BASE_URL)
-            .header("Referer", referer)
-            .header(
-                "Accept",
-                "text/javascript, application/json;q=0.9, */*;q=0.8",
-            )
-            .send()
-            .await?;
-
-        if !response.status().is_success() {
-            if response.status().as_u16() == 401 || response.status().as_u16() == 403 {
-                return Err(ProviderError::AuthRequired);
-            }
-            return Err(ProviderError::Other(format!(
-                "OpenCode subscription API returned {}",
-                response.status()
-            )));
-        }
-
-        let text = response.text().await?;
-
-        if self.looks_signed_out(&text) {
-            return Err(ProviderError::AuthRequired);
-        }
-
-        Ok(text)
+    /// Get the DB path
+    fn opencode_db_path() -> Option<PathBuf> {
+        Self::opencode_dir().map(|p| p.join("opencode.db"))
     }
 
-    /// Parse subscription response into UsageSnapshot
-    fn parse_subscription(&self, text: &str) -> Result<UsageSnapshot, ProviderError> {
-        let now = Utc::now();
-
-        // Try to parse as JSON
-        if let Ok(json) = serde_json::from_str::<Value>(text)
-            && let Some(snapshot) = self.parse_usage_json(&json, now)
-        {
-            return Ok(snapshot);
-        }
-
-        // Fall back to regex-based parsing
-        let rolling = self.extract_usage_regex(text, "rollingUsage")?;
-        let weekly = self.extract_usage_regex(text, "weeklyUsage")?;
-
-        let primary = RateWindow::with_details(
-            rolling.0,
-            Some(300), // 5 hours
-            Some(now + chrono::Duration::seconds(rolling.1)),
-            None,
-        );
-
-        let secondary = RateWindow::with_details(
-            weekly.0,
-            Some(10080), // 7 days
-            Some(now + chrono::Duration::seconds(weekly.1)),
-            None,
-        );
-
-        let mut usage = UsageSnapshot::new(primary)
-            .with_secondary(secondary)
-            .with_login_method("OpenCode");
-        if let Some(renews_at) = self.extract_renewal_regex(text) {
-            usage = usage.with_extra_rate_window(
-                "renewal",
-                "Renews",
-                RateWindow::with_details(0.0, None, Some(renews_at), None),
-            );
-        }
-
-        Ok(usage)
-    }
-
-    /// Parse usage from JSON response
-    fn parse_usage_json(&self, json: &Value, now: DateTime<Utc>) -> Option<UsageSnapshot> {
-        let renews_at = self.find_datetime(json, &["renewAt", "renew_at"]);
-
-        // Look for rollingUsage and weeklyUsage
-        let rolling =
-            self.find_usage_window(json, &["rollingUsage", "rolling", "rolling_usage"])?;
-        let weekly = self.find_usage_window(json, &["weeklyUsage", "weekly", "weekly_usage"])?;
-
-        let primary = RateWindow::with_details(
-            rolling.0,
-            Some(300),
-            Some(now + chrono::Duration::seconds(rolling.1)),
-            None,
-        );
-
-        let secondary = RateWindow::with_details(
-            weekly.0,
-            Some(10080),
-            Some(now + chrono::Duration::seconds(weekly.1)),
-            None,
-        );
-
-        let mut usage = UsageSnapshot::new(primary)
-            .with_secondary(secondary)
-            .with_login_method("OpenCode");
-        if let Some(renews_at) = renews_at {
-            usage = usage.with_extra_rate_window(
-                "renewal",
-                "Renews",
-                RateWindow::with_details(0.0, None, Some(renews_at), None),
-            );
-        }
-
-        Some(usage)
-    }
-
-    /// Find usage window in JSON by keys
-    fn find_usage_window(&self, json: &Value, keys: &[&str]) -> Option<(f64, i64)> {
-        for key in keys {
-            if let Some(obj) = json.get(key)
-                && let Some(window) = self.parse_window(obj)
-            {
-                return Some(window);
-            }
-        }
-
-        // Try nested search
-        if let Some(obj) = json.as_object() {
-            for (_, value) in obj {
-                if let Some(window) = self.find_usage_window(value, keys) {
-                    return Some(window);
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Parse a usage window object
-    fn parse_window(&self, obj: &Value) -> Option<(f64, i64)> {
-        let percent = Self::window_percent(obj)?;
-        let reset_sec = Self::window_reset_seconds(obj).unwrap_or(0);
-        Some((percent.clamp(0.0, 100.0), reset_sec.max(0)))
-    }
-
-    fn window_percent(obj: &Value) -> Option<f64> {
-        let percent_keys = [
-            "usagePercent",
-            "usedPercent",
-            "percentUsed",
-            "percent",
-            "usage_percent",
-            "used_percent",
-            "utilization",
-            "utilizationPercent",
-            "utilization_percent",
-            "usage",
-        ];
-
-        Self::first_f64(obj, &percent_keys)
-            .map(|val| if val <= 1.0 { val * 100.0 } else { val })
-            .or_else(|| Self::percent_from_used_limit(obj))
-    }
-
-    fn percent_from_used_limit(obj: &Value) -> Option<f64> {
-        let used = obj
-            .get("used")
-            .or(obj.get("usage"))
-            .and_then(|v| v.as_f64());
-        let limit = obj
-            .get("limit")
-            .or(obj.get("total"))
-            .and_then(|v| v.as_f64());
-        match (used, limit) {
-            (Some(used), Some(limit)) if limit > 0.0 => Some((used / limit) * 100.0),
-            _ => None,
-        }
-    }
-
-    fn window_reset_seconds(obj: &Value) -> Option<i64> {
-        let reset_in_keys = [
-            "resetInSec",
-            "resetInSeconds",
-            "resetSeconds",
-            "reset_sec",
-            "reset_in_sec",
-            "resetsInSec",
-            "resetsInSeconds",
-            "resetIn",
-            "resetSec",
-        ];
-        let reset_at_keys = [
-            "resetAt",
-            "resetsAt",
-            "reset_at",
-            "resets_at",
-            "nextReset",
-            "next_reset",
-            "renewAt",
-            "renew_at",
-        ];
-
-        Self::first_i64(obj, &reset_in_keys)
-            .or_else(|| Self::reset_at_to_seconds(obj, &reset_at_keys))
-    }
-
-    fn reset_at_to_seconds(obj: &Value, keys: &[&str]) -> Option<i64> {
-        let reset_at = Self::first_i64(obj, keys)?;
-        let now = chrono::Utc::now().timestamp();
-        Some((reset_at - now).max(0))
-    }
-
-    fn find_datetime(&self, json: &Value, keys: &[&str]) -> Option<DateTime<Utc>> {
-        for key in keys {
-            if let Some(value) = json.get(key)
-                && let Some(parsed) = Self::date_from_value(value)
-            {
-                return Some(parsed);
-            }
-        }
-
-        if let Some(obj) = json.as_object() {
-            for value in obj.values() {
-                if let Some(parsed) = self.find_datetime(value, keys) {
-                    return Some(parsed);
-                }
-            }
-        }
-        None
-    }
-
-    fn first_f64(obj: &Value, keys: &[&str]) -> Option<f64> {
-        keys.iter().find_map(|key| obj.get(*key)?.as_f64())
-    }
-
-    fn first_i64(obj: &Value, keys: &[&str]) -> Option<i64> {
-        keys.iter().find_map(|key| obj.get(*key)?.as_i64())
-    }
-
-    fn date_from_value(value: &Value) -> Option<DateTime<Utc>> {
-        if let Some(number) = value.as_i64() {
-            return Self::date_from_timestamp(number as f64);
-        }
-        if let Some(number) = value.as_f64() {
-            return Self::date_from_timestamp(number);
-        }
-        let text = value.as_str()?.trim();
-        if text.is_empty() {
-            return None;
-        }
-        if let Ok(number) = text.parse::<f64>() {
-            return Self::date_from_timestamp(number);
-        }
-        DateTime::parse_from_rfc3339(text)
-            .ok()
-            .map(|dt| dt.with_timezone(&Utc))
-    }
-
-    fn date_from_timestamp(number: f64) -> Option<DateTime<Utc>> {
-        if !number.is_finite() || number <= 0.0 {
-            return None;
-        }
-        let seconds = if number > 10_000_000_000.0 {
-            number / 1000.0
-        } else {
-            number
+    /// Query the OpenCode local SQLite DB for per-provider stats (aggregated from per-model)
+    fn query_local_db_stats(&self) -> Vec<OpenCodeProviderStats> {
+        let db_path = match Self::opencode_db_path() {
+            Some(p) => p,
+            None => return vec![],
         };
-        DateTime::<Utc>::from_timestamp(seconds as i64, 0)
-    }
 
-    fn extract_renewal_regex(&self, text: &str) -> Option<DateTime<Utc>> {
-        let re = regex_lite::Regex::new(
-            r#"(?:"renewAt"|"renew_at"|renewAt|renew_at)\s*[:=]\s*"?([^",}\s]+)"?"#,
-        )
-        .ok()?;
-        let raw = re.captures(text)?.get(1)?.as_str();
-        Self::date_from_value(&Value::String(raw.to_string()))
-    }
+        if !db_path.exists() {
+            return vec![];
+        }
 
-    /// Extract usage via regex patterns
-    fn extract_usage_regex(&self, text: &str, prefix: &str) -> Result<(f64, i64), ProviderError> {
-        let percent_pattern = format!(r"{}[^}}]*?usagePercent\s*:\s*([0-9]+(?:\.[0-9]+)?)", prefix);
-        let reset_pattern = format!(r"{}[^}}]*?resetInSec\s*:\s*([0-9]+)", prefix);
-
-        let percent = self
-            .extract_number(&percent_pattern, text)
-            .ok_or_else(|| ProviderError::Parse(format!("Missing {} percent", prefix)))?;
-
-        let reset = self
-            .extract_number(&reset_pattern, text)
-            .map(|n| n as i64)
-            .unwrap_or(0);
-
-        Ok((percent, reset))
-    }
-
-    /// Extract a number using regex
-    fn extract_number(&self, pattern: &str, text: &str) -> Option<f64> {
-        let re = regex_lite::Regex::new(pattern).ok()?;
-        let caps = re.captures(text)?;
-        caps.get(1)?.as_str().parse().ok()
-    }
-
-    /// Parse workspace IDs from response
-    fn parse_workspace_ids(&self, text: &str) -> Vec<String> {
-        let pattern = r#"id\s*:\s*"(wrk_[^"]+)""#;
-        let re = match regex_lite::Regex::new(pattern) {
-            Ok(r) => r,
+        let conn = match rusqlite_connection(&db_path) {
+            Ok(c) => c,
             Err(_) => return vec![],
         };
 
-        re.captures_iter(text)
-            .filter_map(|caps| caps.get(1).map(|m| m.as_str().to_string()))
-            .collect()
-    }
+        // Query per-model stats (variant merged into model display)
+        let query = r#"
+            SELECT
+              json_extract(model, '$.id') as model_id,
+              json_extract(model, '$.providerID') as provider_id,
+              json_extract(model, '$.variant') as model_variant,
+              COUNT(*) as sessions,
+              SUM(tokens_input) as total_input,
+              SUM(tokens_output) as total_output,
+              SUM(tokens_cache_read) as total_cache_read,
+              SUM(tokens_cache_write) as total_cache_write,
+              SUM(cost) as total_cost
+            FROM session
+            WHERE model IS NOT NULL
+            GROUP BY provider_id, model_id, IFNULL(NULLIF(model_variant, 'default'), '')
+            HAVING sessions > 0
+            ORDER BY total_cost DESC
+        "#;
 
-    /// Check if response indicates user is signed out
-    fn looks_signed_out(&self, text: &str) -> bool {
-        let lower = text.to_lowercase();
-        lower.contains("login") || lower.contains("sign in") || lower.contains("auth/authorize")
-    }
+        // First accumulate per-model stats per provider
+        let mut provider_map: std::collections::HashMap<
+            String,
+            (Vec<OpenCodeModelStats>, i64, i64, f64),
+        > = std::collections::HashMap::new();
 
-    /// URL encode a string for query parameters
-    fn url_encode(s: &str) -> String {
-        let mut result = String::with_capacity(s.len() * 3);
-        for c in s.chars() {
-            match c {
-                'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => {
-                    result.push(c);
-                }
-                _ => {
-                    for b in c.to_string().as_bytes() {
-                        result.push_str(&format!("%{:02X}", b));
+        if let Ok(mut stmt) = conn.prepare(query) {
+            let mut rows = stmt.query([]).ok();
+            while let Some(row) = rows.as_mut().and_then(|r| r.next().ok()).flatten() {
+                let model_id_raw: String = match row.get(0) {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                let provider_id: String = match row.get(1) {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                let model_variant: Option<String> = row.get(2).ok();
+                let sessions: i64 = row.get(3).unwrap_or(0);
+                let total_input: i64 = row.get(4).unwrap_or(0);
+                let total_output: i64 = row.get(5).unwrap_or(0);
+                let total_cache_read: i64 = row.get(6).unwrap_or(0);
+                let total_cache_write: i64 = row.get(7).unwrap_or(0);
+                let total_cost_dollars: f64 = row.get(8).unwrap_or(0.0);
+                let model_id = match model_variant.as_deref() {
+                    Some(v) if !v.is_empty() && v != "default" => {
+                        format!("{} ({})", model_id_raw, v)
                     }
-                }
+                    _ => model_id_raw,
+                };
+                let model_stats = OpenCodeModelStats {
+                    model_id,
+                    sessions,
+                    total_input,
+                    total_output,
+                    total_cache_read,
+                    total_cache_write,
+                    total_cost_dollars,
+                };
+                let tokens = total_input + total_output + total_cache_read;
+                let entry = provider_map.entry(provider_id.clone()).or_insert_with(|| {
+                    (vec![], 0, 0, 0.0)
+                });
+                entry.0.push(model_stats);
+                entry.1 += sessions;
+                entry.2 += tokens;
+                entry.3 += total_cost_dollars;
             }
         }
-        result
+
+        let mut results: Vec<OpenCodeProviderStats> = provider_map
+            .into_iter()
+            .map(|(provider_id, (models, total_sessions, total_tokens, total_cost))| {
+                OpenCodeProviderStats {
+                    provider_id,
+                    models,
+                    total_sessions,
+                    total_tokens,
+                    total_cost_dollars: total_cost,
+                }
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            b.total_cost_dollars
+                .partial_cmp(&a.total_cost_dollars)
+                .unwrap()
+        });
+
+        results
     }
+}
+
+/// Parse model JSON from session.model column: {"id":"MiniMax-M2.7","providerID":"minimax"}
+fn parse_model_json(model_json: &str) -> (String, String) {
+    #[derive(Deserialize)]
+    struct ModelJson {
+        #[serde(rename = "id")]
+        id: Option<String>,
+        #[serde(rename = "providerID")]
+        provider_id: Option<String>,
+        #[serde(rename = "variant")]
+        variant: Option<String>,
+    }
+
+    if let Ok(parsed) = serde_json::from_str::<ModelJson>(model_json) {
+        let provider = parsed.provider_id.unwrap_or_else(|| "unknown".to_string());
+        let id = parsed.id.unwrap_or_else(|| model_json.to_string());
+        let display = match parsed.variant {
+            Some(v) if !v.is_empty() && v != "default" => format!("{} ({})", id, v),
+            _ => id,
+        };
+        return (display, provider);
+    }
+
+    let id_re = regex_lite::Regex::new(r#""id"\s*:\s*"([^"]+)""#).ok();
+    let provider_re = regex_lite::Regex::new(r#""providerID"\s*:\s*"([^"]+)""#).ok();
+
+    let id = id_re
+        .and_then(|r| r.captures(model_json))
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_else(|| model_json.to_string());
+
+    let provider = provider_re
+        .and_then(|r| r.captures(model_json))
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    (id, provider)
+}
+
+/// Get a rusqlite connection
+fn rusqlite_connection(path: &PathBuf) -> Result<rusqlite::Connection, ProviderError> {
+    rusqlite::Connection::open(path)
+        .map_err(|e| ProviderError::Other(format!("Failed to open OpenCode DB: {}", e)))
 }
 
 impl Default for OpenCodeProvider {
@@ -494,60 +281,193 @@ impl Provider for OpenCodeProvider {
         &self.metadata
     }
 
-    async fn fetch_usage(&self, ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
-        tracing::debug!("Fetching OpenCode usage");
+    async fn fetch_usage(&self, _ctx: &FetchContext) -> Result<ProviderFetchResult, ProviderError> {
+        tracing::debug!("Fetching OpenCode usage (dynamic sub-provider delegation)");
 
-        match ctx.source_mode {
-            SourceMode::Auto | SourceMode::Web => {
-                // Check for manual cookie header first
-                if let Some(ref cookie_header) = ctx.manual_cookie_header {
-                    let usage = self.fetch_with_cookies(cookie_header).await?;
-                    return Ok(ProviderFetchResult::new(usage, "web"));
-                }
+        let auth = Self::read_auth_json()?;
 
-                // Try to get cookies from browser
-                #[cfg(windows)]
-                {
-                    use crate::browser::cookies::{Cookie, CookieExtractor};
-                    use crate::browser::detection::BrowserDetector;
+        let now = Utc::now();
+        let primary = RateWindow::with_details(0.0, Some(300), Some(now), None);
+        let mut aggregate = UsageSnapshot::new(primary).with_login_method("OpenCode");
 
-                    let browsers = BrowserDetector::detect_all();
+        let mut got_any = false;
 
-                    for browser in browsers {
-                        if let Ok(cookies) =
-                            CookieExtractor::extract_for_domain(&browser, "opencode.ai")
-                        {
-                            // Build cookie header
-                            let cookie_header: String = cookies
-                                .iter()
-                                .map(|c: &Cookie| format!("{}={}", c.name, c.value))
-                                .collect::<Vec<_>>()
-                                .join("; ");
+        // Pre-fetch DB stats per provider
+        let db_stats_map: std::collections::HashMap<String, OpenCodeProviderStats> = self
+            .query_local_db_stats()
+            .into_iter()
+            .map(|s| (s.provider_id.clone(), s))
+            .collect();
 
-                            if !cookie_header.is_empty() {
-                                match self.fetch_with_cookies(&cookie_header).await {
-                                    Ok(usage) => return Ok(ProviderFetchResult::new(usage, "web")),
-                                    Err(ProviderError::AuthRequired) => continue,
-                                    Err(e) => return Err(e),
-                                }
-                            }
+        // Iterate over ALL entries in auth.json — create a tab for each one
+        for (service_id, entry) in auth.0.iter() {
+            if entry.entry_type != "api" || entry.key.is_empty() {
+                continue;
+            }
+
+            // Map OpenCode service ID (e.g. "zai", "minimax") to ProviderId
+            let provider_id = ProviderId::from_cli_name(service_id);
+
+            // Skip OpenCode itself to avoid infinite recursion
+            if provider_id == Some(ProviderId::OpenCode) {
+                continue;
+            }
+
+            let display_name = provider_id
+                .map(|p| p.display_name().to_string())
+                .unwrap_or_else(|| service_id.clone());
+
+            let mut api_success = false;
+
+            // Try to fetch real-time data if we have a mapping
+            if let Some(pid) = provider_id {
+                if let Ok(sub_provider) = create_provider(pid) {
+                    let ctx = FetchContext {
+                        source_mode: SourceMode::Auto,
+                        include_credits: true,
+                        web_timeout: 30,
+                        verbose: false,
+                        manual_cookie_header: None,
+                        api_key: None,
+                        workspace_id: None,
+                        api_region: None,
+                    };
+
+                    let fetch_result = sub_provider.fetch_usage(&ctx).await;
+                    if let Ok(result) = fetch_result {
+                        got_any = true;
+                        api_success = true;
+
+                        // Primary window
+                        aggregate = aggregate.with_extra_rate_window(
+                            format!("opencode-{}", service_id),
+                            format!("OpenCode / {}", display_name),
+                            result.usage.primary.clone(),
+                        );
+
+                        // Secondary window
+                        if let Some(secondary) = &result.usage.secondary {
+                            aggregate = aggregate.with_extra_rate_window(
+                                format!("opencode-{}-weekly", service_id),
+                                format!("OpenCode / {} Weekly", display_name),
+                                secondary.clone(),
+                            );
                         }
+
+                        // Model-specific window
+                        if let Some(model_spec) = &result.usage.model_specific {
+                            aggregate = aggregate.with_extra_rate_window(
+                                format!("opencode-{}-model", service_id),
+                                format!("OpenCode / {} Model", display_name),
+                                model_spec.clone(),
+                            );
+                        }
+
+                        // Any extra windows
+                        for extra in &result.usage.extra_rate_windows {
+                            aggregate = aggregate.with_extra_rate_window(
+                                format!("opencode-{}-{}", service_id, extra.id),
+                                format!("OpenCode / {} / {}", display_name, extra.title),
+                                extra.window.clone(),
+                            );
+                        }
+                    } else if let Err(e) = fetch_result {
+                        tracing::warn!(
+                            "OpenCode service '{}' fetch failed: {:?}",
+                            service_id,
+                            e
+                        );
                     }
                 }
-
-                Err(ProviderError::AuthRequired)
+            } else {
+                tracing::debug!(
+                    "OpenCode service '{}' has no CodexBar mapping, showing DB stats only",
+                    service_id
+                );
             }
-            SourceMode::Cli => Err(ProviderError::UnsupportedSource(SourceMode::Cli)),
-            SourceMode::OAuth => Err(ProviderError::UnsupportedSource(SourceMode::OAuth)),
+
+            // Always add a placeholder window so this service gets a tab,
+            // even if the API call failed (DB stats will populate below)
+            if !api_success {
+                aggregate = aggregate.with_extra_rate_window(
+                    format!("opencode-{}", service_id),
+                    format!("OpenCode / {}", display_name),
+                    RateWindow::with_details(
+                        0.0,
+                        None,
+                        None,
+                        Some("No real-time data — configure provider in CodexBar settings".to_string()),
+                    ),
+                );
+            }
         }
+
+        if !got_any && auth.0.is_empty() {
+            return Err(ProviderError::NotInstalled(
+                "No providers configured in OpenCode auth.json".to_string(),
+            ));
+        }
+
+        // Attach DB stats as model rows under the service's tab
+        // Use window IDs: opencode-db-{provider_id}-{model_index}
+        for (provider_id, stats) in &db_stats_map {
+            // Find the matching service_id in auth.json (case-insensitive)
+            let service_id = auth
+                .0
+                .keys()
+                .find(|s| s.to_lowercase() == provider_id.to_lowercase());
+
+            let tab_label = service_id
+                .map(|s| ProviderId::from_cli_name(s).map(|p| p.display_name().to_string()).unwrap_or_else(|| s.clone()))
+                .unwrap_or_else(|| provider_id.clone());
+
+            for (idx, model) in stats.models.iter().enumerate() {
+                aggregate = aggregate.with_extra_rate_window(
+                    format!("opencode-db-{}-{}", provider_id, idx),
+                    format!("  {} — {} sessions, {} tokens, ${:.4}",
+                        model.model_id, model.sessions,
+                        model.total_input + model.total_output + model.total_cache_read,
+                        model.total_cost_dollars
+                    ),
+                    RateWindow::with_details(
+                        0.0,
+                        None,
+                        None,
+                        Some(format!(
+                            "{} sessions | {} tokens | ${:.4}",
+                            model.sessions,
+                            model.total_input + model.total_output + model.total_cache_read,
+                            model.total_cost_dollars
+                        )),
+                    ),
+                );
+            }
+
+            // Also add a summary row for this provider's DB total
+            aggregate = aggregate.with_extra_rate_window(
+                format!("opencode-db-summary-{}", provider_id),
+                format!("{} — OpenCode tracked total", tab_label),
+                RateWindow::with_details(
+                    0.0,
+                    None,
+                    None,
+                    Some(format!(
+                        "{} sessions | {} tokens | ${:.4}",
+                        stats.total_sessions, stats.total_tokens, stats.total_cost_dollars
+                    )),
+                ),
+            );
+        }
+
+        Ok(ProviderFetchResult::new(aggregate, "opencode"))
     }
 
     fn available_sources(&self) -> Vec<SourceMode> {
-        vec![SourceMode::Auto, SourceMode::Web]
+        vec![SourceMode::Auto]
     }
 
     fn supports_web(&self) -> bool {
-        true
+        false
     }
 
     fn supports_cli(&self) -> bool {
@@ -560,25 +480,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_json_renewal_window() {
-        let provider = OpenCodeProvider::new();
-        let now = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
-        let payload = serde_json::json!({
-            "rollingUsage": { "usagePercent": 10, "resetInSec": 600 },
-            "weeklyUsage": { "usagePercent": 50, "resetInSec": 3600 },
-            "renewAt": "2026-06-01T12:00:00Z"
-        });
+    fn parses_model_json_correctly() {
+        let (id, provider) = parse_model_json(r#"{"id":"MiniMax-M2.7","providerID":"minimax"}"#);
+        assert_eq!(id, "MiniMax-M2.7");
+        assert_eq!(provider, "minimax");
+    }
 
-        let snap = provider.parse_usage_json(&payload, now).expect("snapshot");
-        let renewal = snap
-            .extra_rate_windows
-            .iter()
-            .find(|window| window.id == "renewal")
-            .expect("renewal window");
-        assert_eq!(renewal.title, "Renews");
-        assert_eq!(
-            renewal.window.resets_at.unwrap().to_rfc3339(),
-            "2026-06-01T12:00:00+00:00"
+    #[test]
+    fn parses_model_json_with_variant() {
+        let (id, provider) =
+            parse_model_json(r#"{"id":"gpt-5.5","providerID":"freemodel","variant":"default"}"#);
+        assert_eq!(id, "gpt-5.5");
+        assert_eq!(provider, "freemodel");
+    }
+
+    #[test]
+    fn parses_model_json_with_non_default_variant() {
+        let (id, provider) = parse_model_json(
+            r#"{"id":"MiniMax-M2.7","providerID":"minimax","variant":"premium"}"#,
         );
+        assert_eq!(id, "MiniMax-M2.7 (premium)");
+        assert_eq!(provider, "minimax");
+    }
+
+    #[test]
+    fn parses_invalid_model_json_falls_back() {
+        let (id, provider) = parse_model_json("not json at all");
+        assert_eq!(id, "not json at all");
+        assert_eq!(provider, "unknown");
     }
 }

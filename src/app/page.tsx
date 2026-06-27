@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, createContext, useContext } from "react";
-import { useCodexBar } from "@/hooks/useCodexBar";
+import { useProviders } from "@/hooks/useProviders";
 import ErrorBanner from "@/components/ErrorBanner";
 import FloatingThemeToggle from "@/components/FloatingThemeToggle";
 import ProviderDetail from "@/components/ProviderDetail";
+import OpenCodeDetail from "@/components/OpenCodeDetail";
 import ProviderHeader from "@/components/ProviderHeader";
 import ProviderTabBar from "@/components/ProviderTabBar";
 import SettingsModal from "@/components/SettingsModal";
@@ -47,7 +48,7 @@ export default function HomePage() {
   const {
     providers,
     costData,
-    cliStatus,
+    backendStatus,
     error,
     isRefreshing,
     settings,
@@ -60,7 +61,7 @@ export default function HomePage() {
     removeCredential,
     importBrowserCookies,
     refetchBrowsers,
-  } = useCodexBar();
+  } = useProviders();
 
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -177,8 +178,12 @@ export default function HomePage() {
 
   // Stable callback for theme toggle
   const handleToggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  }, []);
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    if (settings) {
+      updateAppSettings({ ...settings, theme: nextTheme });
+    }
+  }, [settings, theme, updateAppSettings]);
 
   // Theme context value - only changes when theme actually changes
   const themeContextValue = useMemo(() => ({
@@ -202,7 +207,7 @@ export default function HomePage() {
 
           {/* App Title & Refresh Bar */}
           {/* <ProviderHeader
-            cliStatus={cliStatus}
+            backendStatus={backendStatus}
             isRefreshing={isRefreshing}
             onRefresh={refreshData}
           /> */}
@@ -225,10 +230,14 @@ export default function HomePage() {
 
               {/* Provider detail area */}
               {activeProviderObj && (
-                <ProviderDetail
-                  provider={activeProviderObj}
-                  costItem={activeCostItem}
-                />
+                activeProviderObj.provider === "opencode" ? (
+                  <OpenCodeDetail provider={activeProviderObj} />
+                ) : (
+                  <ProviderDetail
+                    provider={activeProviderObj}
+                    costItem={activeCostItem}
+                  />
+                )
               )}
             </>
           )}

@@ -3,16 +3,16 @@
 import { memo } from "react";
 import { Sun, Moon, RefreshCw } from "@/lib/icons";
 import { useTheme } from "@/app/page";
-import type { CliStatus } from "@/lib/types";
+import type { BackendStatus } from "@/lib/types";
 
 interface ProviderHeaderProps {
-  cliStatus: CliStatus;
+  backendStatus: BackendStatus;
   isRefreshing: boolean;
   onRefresh: () => void;
 }
 
 export default memo(function ProviderHeader({
-  cliStatus,
+  backendStatus,
   isRefreshing,
   onRefresh,
 }: ProviderHeaderProps) {
@@ -26,9 +26,9 @@ export default memo(function ProviderHeader({
         </h1>
         <span
           className={`w-1.5 h-1.5 rounded-full ${
-            cliStatus.status === "available" ? "bg-status-ok" : "bg-status-warning"
+            backendStatus.status === "available" ? "bg-status-ok" : "bg-status-warning"
           } animate-pulse`}
-          title={cliStatus.status === "available" ? "Backend Connected" : "Connecting..."}
+          title={backendStatus.status === "available" ? "Backend Connected" : "Connecting..."}
         />
       </div>
 

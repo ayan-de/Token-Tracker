@@ -1,7 +1,7 @@
-export type CliStatusType = "available" | "not_installed" | "demo" | "connecting" | "error";
+export type BackendStatusType = "available" | "not_installed" | "demo" | "connecting" | "error";
 
-export interface CliStatus {
-  status: CliStatusType;
+export interface BackendStatus {
+  status: BackendStatusType;
 }
 
 export type PacingStage =
