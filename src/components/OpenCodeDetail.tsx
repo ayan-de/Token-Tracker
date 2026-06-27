@@ -132,16 +132,14 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
         <div key={w.id} className="py-2 border-b border-border-subtle space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-text-main">{w.title}</span>
-            <span className="text-[11px] text-text-muted">{pct > 0 ? `${pct.toFixed(1)}%` : "—"}</span>
+            <span className="text-[11px] text-text-muted">{pct > 0 ? `${pct.toFixed(1)}%` : "0%"}</span>
           </div>
-          {pct > 0 && (
-            <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
-              <div
-                className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all`}
-                style={{ width: `${fillPercent}%` }}
-              />
-            </div>
-          )}
+          <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
+            <div
+              className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all`}
+              style={{ width: `${fillPercent}%` }}
+            />
+          </div>
           {resetsIn && (
             <div className="text-[10px] text-text-muted/70">Resets {resetsIn}</div>
           )}
