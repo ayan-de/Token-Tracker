@@ -1,0 +1,90 @@
+//! Dynamic provider factory
+//!
+//! Creates provider instances by ProviderId. All providers implement the `Provider` trait
+//! so we can return them as `Box<dyn Provider>`.
+
+use std::sync::Arc;
+
+use crate::core::{Provider, ProviderError, ProviderId};
+
+use super::{
+    abacus::AbacusProvider, alibaba::AlibabaProvider, alibabatokenplan::AlibabaTokenPlanProvider,
+    amp::AmpProvider, antigravity::AntigravityProvider, augment::AugmentProvider,
+    azureopenai::AzureOpenAIProvider, bedrock::BedrockProvider, chutes::ChutesProvider,
+    claude::ClaudeProvider, codebuff::CodebuffProvider, codex::CodexProvider,
+    commandcode::CommandCodeProvider, copilot::CopilotProvider, crof::CrofProvider,
+    cursor::CursorProvider, deepgram::DeepgramProvider, deepseek::DeepSeekProvider,
+    devin::DevinProvider, doubao::DoubaoProvider, elevenlabs::ElevenLabsProvider,
+    factory::FactoryProvider, freemodel::FreeModelProvider, gemini::GeminiProvider,
+    grok::GrokProvider, groq::GroqProvider, infini::InfiniProvider, jetbrains::JetBrainsProvider,
+    kilo::KiloProvider, kimi::KimiProvider, kimik2::KimiK2Provider, kiro::KiroProvider,
+    litellm::LiteLLMProvider, llmproxy::LLMProxyProvider, manus::ManusProvider,
+    mimo::MiMoProvider, minimax::MiniMaxProvider, mistral::MistralProvider,
+    nanogpt::NanoGPTProvider, ollama::OllamaProvider,
+    openaiapi::OpenAIApiProvider, opencode::OpenCodeProvider, opencodego::OpenCodeGoProvider,
+    openrouter::OpenRouterProvider, perplexity::PerplexityProvider, poe::PoeProvider,
+    stepfun::StepFunProvider, synthetic::SyntheticProvider, t3chat::T3ChatProvider,
+    venice::VeniceProvider, vertexai::VertexAIProvider, warp::WarpProvider,
+    windsurf::WindsurfProvider, zai::ZaiProvider, zed::ZedProvider,
+};
+
+/// Create a provider instance by ProviderId
+pub fn create_provider(id: ProviderId) -> Result<Arc<dyn Provider>, ProviderError> {
+    match id {
+        ProviderId::Abacus => Ok(Arc::new(AbacusProvider::new())),
+        ProviderId::Alibaba => Ok(Arc::new(AlibabaProvider::new())),
+        ProviderId::AlibabaTokenPlan => Ok(Arc::new(AlibabaTokenPlanProvider::new())),
+        ProviderId::Amp => Ok(Arc::new(AmpProvider::new())),
+        ProviderId::Antigravity => Ok(Arc::new(AntigravityProvider::new())),
+        ProviderId::Augment => Ok(Arc::new(AugmentProvider::new())),
+        ProviderId::AzureOpenAI => Ok(Arc::new(AzureOpenAIProvider::new())),
+        ProviderId::Bedrock => Ok(Arc::new(BedrockProvider::new())),
+        ProviderId::Chutes => Ok(Arc::new(ChutesProvider::new())),
+        ProviderId::Claude => Ok(Arc::new(ClaudeProvider::new())),
+        ProviderId::Codebuff => Ok(Arc::new(CodebuffProvider::new())),
+        ProviderId::Codex => Ok(Arc::new(CodexProvider::new())),
+        ProviderId::CommandCode => Ok(Arc::new(CommandCodeProvider::new())),
+        ProviderId::Copilot => Ok(Arc::new(CopilotProvider::new())),
+        ProviderId::Crof => Ok(Arc::new(CrofProvider::new())),
+        ProviderId::Cursor => Ok(Arc::new(CursorProvider::new())),
+        ProviderId::Deepgram => Ok(Arc::new(DeepgramProvider::new())),
+        ProviderId::DeepSeek => Ok(Arc::new(DeepSeekProvider::new())),
+        ProviderId::Devin => Ok(Arc::new(DevinProvider::new())),
+        ProviderId::Doubao => Ok(Arc::new(DoubaoProvider::new())),
+        ProviderId::ElevenLabs => Ok(Arc::new(ElevenLabsProvider::new())),
+        ProviderId::Factory => Ok(Arc::new(FactoryProvider::new())),
+        ProviderId::FreeModel => Ok(Arc::new(FreeModelProvider::new())),
+        ProviderId::Gemini => Ok(Arc::new(GeminiProvider::new())),
+        ProviderId::Grok => Ok(Arc::new(GrokProvider::new())),
+        ProviderId::Groq => Ok(Arc::new(GroqProvider::new())),
+        ProviderId::Infini => Ok(Arc::new(InfiniProvider::default())),
+        ProviderId::JetBrains => Ok(Arc::new(JetBrainsProvider::new())),
+        ProviderId::Kilo => Ok(Arc::new(KiloProvider::new())),
+        ProviderId::Kimi => Ok(Arc::new(KimiProvider::new())),
+        ProviderId::KimiK2 => Ok(Arc::new(KimiK2Provider::new())),
+        ProviderId::Kiro => Ok(Arc::new(KiroProvider::new())),
+        ProviderId::LiteLLM => Ok(Arc::new(LiteLLMProvider::new())),
+        ProviderId::LLMProxy => Ok(Arc::new(LLMProxyProvider::new())),
+        ProviderId::Manus => Ok(Arc::new(ManusProvider::new())),
+        ProviderId::MiMo => Ok(Arc::new(MiMoProvider::new())),
+        ProviderId::MiniMax => Ok(Arc::new(MiniMaxProvider::new())),
+        ProviderId::Mistral => Ok(Arc::new(MistralProvider::new())),
+        ProviderId::NanoGPT => Ok(Arc::new(NanoGPTProvider::new())),
+        ProviderId::Ollama => Ok(Arc::new(OllamaProvider::new())),
+        ProviderId::OpenAIApi => Ok(Arc::new(OpenAIApiProvider::new())),
+        ProviderId::OpenCode => Ok(Arc::new(OpenCodeProvider::new())),
+        ProviderId::OpenCodeGo => Ok(Arc::new(OpenCodeGoProvider::new())),
+        ProviderId::OpenRouter => Ok(Arc::new(OpenRouterProvider::new())),
+        ProviderId::Perplexity => Ok(Arc::new(PerplexityProvider::new())),
+        ProviderId::Poe => Ok(Arc::new(PoeProvider::new())),
+        ProviderId::StepFun => Ok(Arc::new(StepFunProvider::new())),
+        ProviderId::Synthetic => Ok(Arc::new(SyntheticProvider::new())),
+        ProviderId::T3Chat => Ok(Arc::new(T3ChatProvider::new())),
+        ProviderId::Venice => Ok(Arc::new(VeniceProvider::new())),
+        ProviderId::VertexAI => Ok(Arc::new(VertexAIProvider::new())),
+        ProviderId::Warp => Ok(Arc::new(WarpProvider::new())),
+        ProviderId::Windsurf => Ok(Arc::new(WindsurfProvider::new())),
+        ProviderId::Zai => Ok(Arc::new(ZaiProvider::new())),
+        ProviderId::Zed => Ok(Arc::new(ZedProvider::new())),
+    }
+}

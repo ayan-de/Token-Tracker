@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+pub mod provider_factory;
 pub mod abacus;
 pub mod alibaba;
 pub mod alibabatokenplan;
