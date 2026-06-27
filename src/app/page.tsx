@@ -5,6 +5,7 @@ import { useProviders } from "@/hooks/useProviders";
 import ErrorBanner from "@/components/ErrorBanner";
 import FloatingThemeToggle from "@/components/FloatingThemeToggle";
 import ProviderDetail from "@/components/ProviderDetail";
+import OpenCodeDetail from "@/components/OpenCodeDetail";
 import ProviderHeader from "@/components/ProviderHeader";
 import ProviderTabBar from "@/components/ProviderTabBar";
 import SettingsModal from "@/components/SettingsModal";
@@ -177,8 +178,12 @@ export default function HomePage() {
 
   // Stable callback for theme toggle
   const handleToggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  }, []);
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    if (settings) {
+      updateAppSettings({ ...settings, theme: nextTheme });
+    }
+  }, [settings, theme, updateAppSettings]);
 
   // Theme context value - only changes when theme actually changes
   const themeContextValue = useMemo(() => ({
@@ -225,10 +230,14 @@ export default function HomePage() {
 
               {/* Provider detail area */}
               {activeProviderObj && (
-                <ProviderDetail
-                  provider={activeProviderObj}
-                  costItem={activeCostItem}
-                />
+                activeProviderObj.provider === "opencode" ? (
+                  <OpenCodeDetail provider={activeProviderObj} />
+                ) : (
+                  <ProviderDetail
+                    provider={activeProviderObj}
+                    costItem={activeCostItem}
+                  />
+                )
               )}
             </>
           )}
