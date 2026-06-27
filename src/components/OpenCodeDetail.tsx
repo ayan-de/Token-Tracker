@@ -6,6 +6,7 @@ import { providerLogo } from "@/lib/dataMapping";
 import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
 import ProviderSubTabBar, { type SubTab } from "./ProviderSubTabBar";
 import OpenCodeDBHistory from "./OpenCodeDBHistory";
+import LoginMethodBadge from "./LoginMethodBadge";
 import { useTheme } from "@/app/page";
 
 interface OpenCodeDetailProps {
@@ -161,19 +162,17 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
             <img src={logoUrl} alt="" className="w-8 h-8 object-contain" />
           )}
           <div className="flex flex-col">
-            <h2 className="text-base font-bold text-text-main leading-tight flex items-center gap-2">
-              OpenCode
-              {providerCount > 0 && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-sm bg-accent-blue/20 text-accent-blue border border-accent-blue/20">
-                  {providerCount} provider{providerCount !== 1 ? "s" : ""} found
-                </span>
-              )}
-            </h2>
+            <h2 className="text-base font-bold text-text-main leading-tight">OpenCode</h2>
             <span className="text-[11px] text-text-muted/75">
               BYOK aggregator — usage via each provider&apos;s API
             </span>
           </div>
         </div>
+        {providerCount > 0 && (
+          <LoginMethodBadge
+            loginMethod={`${providerCount} provider${providerCount !== 1 ? "s" : ""}`}
+          />
+        )}
       </div>
 
       {/* Nested Sub-Tab Bar */}
