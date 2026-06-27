@@ -40,7 +40,7 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
     bm_session: { key: 'bm_session', label: 'Session Cookie (bm_session)', placeholder: 'bm_session=...', type: 'password', required: true },
   }},
   copilot:   { displayName: "Copilot",    logo: "/logos/github-copilot.svg",   logoDark: "/logos/github-copilot-dark.svg", sessionLabel: "Premium", weeklyLabel: "Chat", importable: true },
-  zai:        { displayName: "z.ai",        logo: "",                         sessionLabel: "Tokens", weeklyLabel: "MCP" },
+  zai:        { displayName: "z.ai",        logo: "/logos/zai-light.svg", logoDark: "/logos/zai-dark.svg", sessionLabel: "Tokens", weeklyLabel: "MCP" },
   minimax:   { displayName: "MiniMax",     logo: "/logos/minimax.svg",        sessionLabel: "5-hour", weeklyLabel: "Weekly", importable: true, credentialFields: {
     api_key:   { key: 'api_key',   label: 'API Key',    placeholder: 'sk-cp-...',      type: 'password', required: true },
     group_id: { key: 'group_id', label: 'Group ID',  placeholder: 'Your Group ID',  type: 'text',      required: true },

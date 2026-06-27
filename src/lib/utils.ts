@@ -69,6 +69,7 @@ const LOGO_GRADIENTS: Partial<Record<string, string>> = {
   mistral: "from-[#ffaf00] to-[#cc8c00]",
   ollama: "from-[#d0395c] to-[#a62e4a]",
   openai: "from-[#b7d039] to-[#92a62e]",
+  opencode: "from-[#211E1E] to-[#CFCECD]",
   openrouter: "from-[#d09139] to-[#a6742e]",
   windsurf: "from-[#d03970] to-[#a62e5a]",
 };

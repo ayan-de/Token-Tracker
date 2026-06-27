@@ -3,6 +3,8 @@
 import { memo, useRef, useCallback, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "@/lib/icons";
 import { getProviderGradient } from "@/lib/utils";
+import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
+import { useTheme } from "@/app/page";
 
 export interface SubTab {
   id: string;
@@ -27,30 +29,61 @@ const SubTabButton = memo(function SubTabButton({
   isSelected: boolean;
   onSelect: (id: string) => void;
 }) {
+  const { theme } = useTheme();
   const gradient = tab.gradient || getProviderGradient(tab.id);
+  const desc = PROVIDER_DESCRIPTORS[tab.id.toLowerCase()] || { displayName: tab.label };
 
   return (
     <button
       onClick={() => onSelect(tab.id)}
-      className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] font-semibold whitespace-nowrap cursor-pointer border-0 outline-none focus:outline-none flex-none transition-all ${
+      className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-sm text-[10px] font-semibold whitespace-nowrap cursor-pointer border-0 outline-none focus:outline-none flex-none transition-all ${
         isSelected
-          ? "text-white"
+          ? `text-white shadow-lg shadow-[#3b82f6]/25`
           : "bg-transparent text-text-muted hover:text-text-main hover:bg-hover-subtle"
       }`}
-      style={isSelected ? { backgroundColor: "rgba(59, 130, 246, 0.8)" } : undefined}
+      style={isSelected ? { backgroundColor: "#3b82f6" } : undefined}
     >
-      <span>{tab.label}</span>
-
-      {/* Mini progress bar */}
-      {!isSelected && tab.usedPercent !== undefined && (
-        <div className="w-6 h-1 bg-border-subtle/50 rounded-full overflow-hidden">
+      {/* Logo */}
+      <div className="relative flex items-center justify-center w-7 h-7">
+        {isSelected && (
           <div
-            className={`h-full rounded-full bg-gradient-to-r ${gradient}`}
-            style={{ width: `${Math.min(Math.max(tab.usedPercent, 0), 100)}%` }}
+            className="absolute inset-0 rounded-full bg-white"
+            style={{
+              boxShadow:
+                "0 0 10px 3px rgba(255, 255, 255, 0.4), 0 0 25px 8px rgba(255, 255, 255, 0.3), 0 0 50px 15px rgba(255, 255, 255, 0.2), 0 0 100px 30px rgba(255, 255, 255, 0.1)",
+            }}
+          />
+        )}
+        {providerLogo(tab.id, theme) ? (
+          <img
+            src={providerLogo(tab.id, theme)}
+            alt=""
+            className={`w-5 h-5 object-contain relative z-10 ${
+              isSelected ? "opacity-100" : "opacity-80"
+            }`}
+          />
+        ) : (
+          <div
+            className={`w-2 h-2 rounded-full bg-gradient-to-r ${gradient} relative z-10`}
+          />
+        )}
+      </div>
+
+      <span>{desc.displayName}</span>
+
+      {/* Progress bar under the label */}
+      {!isSelected ? (
+        <div className="w-8 h-1 bg-border-subtle/50 rounded-full overflow-hidden mt-0.5">
+          <div
+            className={`h-full rounded-full transition-all duration-500 bg-gradient-to-r ${gradient}`}
+            style={{
+              width: `${Math.min(Math.max(tab.usedPercent || 0, 0), 100)}%`,
+            }}
           />
         </div>
+      ) : (
+        <div className="w-8 h-1 mt-0.5 opacity-0" />
       )}
-      {isSelected && <div className="w-6 h-1" />}
     </button>
   );
 });

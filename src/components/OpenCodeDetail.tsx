@@ -3,7 +3,7 @@
 import { memo, useState, useMemo, useCallback } from "react";
 import type { ProviderUsage, NamedRateWindow } from "@/lib/types";
 import { providerLogo, PROVIDER_DESCRIPTORS } from "@/lib/dataMapping";
-import { formatTimeUntil } from "@/lib/utils";
+import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
 import ProviderSubTabBar, { type SubTab } from "./ProviderSubTabBar";
 import { useTheme } from "@/app/page";
 
@@ -122,36 +122,40 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
   const logoUrl = providerLogo("opencode", theme);
 
   // Build a "configure" message for sub-tabs with no real-time data
-  const renderWindowRow = (w: NamedRateWindow) => {
-    const pct = w.window.usedPercent;
-    const resetsIn = w.window.resetsAt
-      ? formatTimeUntil(w.window.resetsAt)
-      : null;
-    const fillPercent = Math.min(Math.max(pct || 0, 0), 100);
+  const renderWindowRow = useCallback(
+    (w: NamedRateWindow) => {
+      const pct = w.window.usedPercent;
+      const resetsIn = w.window.resetsAt
+        ? formatTimeUntil(w.window.resetsAt)
+        : null;
+      const fillPercent = Math.min(Math.max(pct || 0, 0), 100);
+      const gradient = getProviderGradient("opencode");
 
-    return (
-      <div key={w.id} className="py-2 border-b border-border-subtle space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-text-main">{w.title}</span>
-          <span className="text-[11px] text-text-muted">{pct > 0 ? `${pct.toFixed(1)}%` : "—"}</span>
-        </div>
-        {pct > 0 && (
-          <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
-            <div
-              className="h-full bg-accent-blue rounded-full transition-all"
-              style={{ width: `${fillPercent}%` }}
-            />
+      return (
+        <div key={w.id} className="py-2 border-b border-border-subtle space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-text-main">{w.title}</span>
+            <span className="text-[11px] text-text-muted">{pct > 0 ? `${pct.toFixed(1)}%` : "—"}</span>
           </div>
-        )}
-        {resetsIn && (
-          <div className="text-[10px] text-text-muted/70">Resets {resetsIn}</div>
-        )}
-        {w.window.resetDescription && !resetsIn && (
-          <div className="text-[10px] text-text-muted/70">{w.window.resetDescription}</div>
-        )}
-      </div>
-    );
-  };
+          {pct > 0 && (
+            <div className="h-1 w-full bg-bg-subtle rounded-full overflow-hidden">
+              <div
+                className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all`}
+                style={{ width: `${fillPercent}%` }}
+              />
+            </div>
+          )}
+          {resetsIn && (
+            <div className="text-[10px] text-text-muted/70">Resets {resetsIn}</div>
+          )}
+          {w.window.resetDescription && !resetsIn && (
+            <div className="text-[10px] text-text-muted/70">{w.window.resetDescription}</div>
+          )}
+        </div>
+      );
+    },
+    []
+  );
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
