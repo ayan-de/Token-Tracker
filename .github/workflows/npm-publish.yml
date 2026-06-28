@@ -6,30 +6,46 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org/"
 
-      - name: Download .deb from GitHub release
+      - name: Install Rust
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION"
-          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
-          RELEASE_DATA=$(curl -s https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION)
-          echo "RELEASE_DATA=$RELEASE_DATA" | head -c 500
-          echo "---"
-          ASSET_URL=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | contains("amd64.deb")) | .browser_download_url')
-          echo "ASSET_URL=$ASSET_URL"
-          echo "Downloading: $ASSET_URL"
-          curl -L -o release.deb "$ASSET_URL"
-          ls -la release.deb
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/env" >> $GITHUB_ENV
+
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build .deb
+        run: |
+          npm install
+          npm run build
+          npx tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find .deb
+        run: |
+          find . -name "*.deb" -type f | head -5
+
+      - name: Upload .deb to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            src-tauri/target/release/bundle/deb/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install npm dependencies
         run: npm ci
