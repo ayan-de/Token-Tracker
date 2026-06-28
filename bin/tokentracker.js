@@ -56,10 +56,10 @@ function followRedirect(url, destPath) {
   });
 }
 
-async function installMissingAppImage({ runtime }) {
+async function installMissingAppImage({ github, runtime }) {
   const archStr = os.arch() === "x64" ? "x64" : os.arch();
-  const arch = normalizeArch(archStr);
-  const version = await getDesiredVersion({
+  const arch = github.normalizeArch(archStr);
+  const version = await github.getDesiredVersion({
     env: process.env,
     getLatestVersion: () => getLatestVersion({ https }),
   });
@@ -67,7 +67,7 @@ async function installMissingAppImage({ runtime }) {
   const normalizedArch = arch === "x64" ? "amd64" : arch;
   const destPath = path.join(downloadsDir, `TokenTracker_${version}_${normalizedArch}.AppImage`);
 
-  const result = await downloadReleaseAsset({
+  const result = await github.downloadReleaseAsset({
     version,
     arch,
     downloadsDir,
@@ -91,7 +91,12 @@ const launcher = createLauncher({
     info: (message) => console.log(message),
     exit: (code) => process.exit(code),
   },
-  github: {},
+  github: {
+    getLatestVersion,
+    getDesiredVersion,
+    downloadReleaseAsset,
+    normalizeArch,
+  },
   spawnAppImage: spawnInstalledBinary,
   installMissingAppImage,
 });
