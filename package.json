@@ -1,8 +1,12 @@
 {
-  "name": "tokentracker",
-  "private": true,
-  "version": "0.1.4",
+  "name": "@thisisayande/tokentracker",
+  "version": "0.1.5",
+  "private": false,
   "type": "module",
+  "description": "AI Provider Quota Monitor - track usage, rate limits, and spend across 40+ LLM providers",
+  "bin": {
+    "tokentracker": "./bin/tokentracker.js"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +14,16 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "next build && tauri build",
     "test:smoke": "playwright test",
-    "test:smoke:ui": "playwright test --ui"
+    "test:smoke:ui": "playwright test --ui",
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "dist/"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

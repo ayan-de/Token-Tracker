@@ -1,0 +1,41 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org/"
+
+      - name: Download .deb from GitHub release
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ASSET_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION \
+            | jq -r '.assets[] | select(.name | test("amd64\\.deb$")) | .browser_download_url')
+          echo "Downloading: $ASSET_URL"
+          curl -L -o release.deb "$ASSET_URL"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Pack tarball
+        run: |
+          mkdir -p dist
+          cp bin/tokentracker.js dist/tokentracker
+          chmod +x dist/tokentracker
+          tar -czvf dist/tokentracker.tar.gz -C dist .
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
