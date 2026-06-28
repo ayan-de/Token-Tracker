@@ -36,3 +36,6 @@ dist-ssr
 # Next.js build artifacts
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# Local git worktrees
+.worktrees/
