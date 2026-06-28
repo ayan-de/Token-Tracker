@@ -61,7 +61,7 @@ async function installMissingAppImage({ github, runtime }) {
   const arch = github.normalizeArch(archStr);
   const version = await github.getDesiredVersion({
     env: process.env,
-    getLatestVersion: () => getLatestVersion({ https }),
+    getLatestVersion: () => github.getLatestVersion({ https }),
   });
   const { downloadsDir } = getRuntimePaths();
   const normalizedArch = arch === "x64" ? "amd64" : arch;

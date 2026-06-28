@@ -1,10 +1,12 @@
 import fs from "fs";
-import { APP_NAME, REPO, APPIMAGE_EXT } from "./constants.js";
+import { APP_NAME, REPO, APPIMAGE_EXT, RELEASES_URL } from "./constants.js";
 
 export function normalizeArch(arch) {
   if (arch === "x64") return "amd64";
   if (arch === "amd64") return "amd64";
-  throw new Error(`Unsupported architecture: ${arch}`);
+  throw new Error(
+    `Unsupported architecture: ${arch}. Download manually: ${RELEASES_URL}`
+  );
 }
 
 export async function getLatestVersion({ https = globalThis.https } = {}) {
@@ -56,12 +58,10 @@ export async function downloadReleaseAsset({
   https: httpsMod = globalThis.https,
   followRedirect,
 }) {
-  const normalizedArch = normalizeArch(arch);
-  const fileName = `${APP_NAME}_${version}_${normalizedArch}${APPIMAGE_EXT}`;
+  const fileName = `${APP_NAME}_${version}_${arch}${APPIMAGE_EXT}`;
   const partialPath = `${downloadsDir}/${fileName}.download`;
   const finalPath = `${downloadsDir}/${fileName}`;
 
-  let downloadedPath;
   try {
     const redirectUrl = await new Promise((resolve, reject) => {
       const options = {
@@ -86,7 +86,7 @@ export async function downloadReleaseAsset({
       req.end();
     });
 
-    downloadedPath = await followRedirect(redirectUrl);
+    const downloadedPath = await followRedirect(redirectUrl, partialPath);
 
     const writeStream = fs.createWriteStream(partialPath);
     const readStream = fs.createReadStream(downloadedPath);
@@ -98,16 +98,12 @@ export async function downloadReleaseAsset({
       readStream.on("error", reject);
     });
 
+    await fs.promises.rm(downloadedPath, { force: true });
     await fs.promises.rename(partialPath, finalPath);
   } catch (err) {
     try {
       await fs.promises.rm(partialPath, { force: true });
     } catch {}
-    if (downloadedPath && downloadedPath !== finalPath) {
-      try {
-        await fs.promises.rm(downloadedPath, { force: true });
-      } catch {}
-    }
     throw err;
   }
 
