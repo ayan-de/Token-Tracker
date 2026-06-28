@@ -1,16 +1,10 @@
 #!/usr/bin/env node
-import fs from "fs";
 import { spawn } from "child_process";
 import os from "os";
 import { createLauncher } from "./lib/launcher.js";
 
 function getCachedAppImagePath() {
-  const tokentrackerBin = "/usr/lib/TokenTracker/_up_/target/release/backend";
-  const tauriBin = "/usr/bin/tokentracker";
-
-  if (fs.existsSync(tauriBin)) return tauriBin;
-  if (fs.existsSync(tokentrackerBin)) return tokentrackerBin;
-  return null;
+  return process.env.TOKEN_TRACKER_CACHED_APPIMAGE_PATH ?? null;
 }
 
 function spawnInstalledBinary(binPath) {

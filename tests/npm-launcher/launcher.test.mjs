@@ -1,8 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "fs";
 
 import { createLauncher } from "../../bin/lib/launcher.js";
-import { INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE } from "../../bin/lib/constants.js";
+
+test("wrapper no longer encodes legacy installed system binary paths", () => {
+  const wrapperSource = fs.readFileSync(
+    new URL("../../bin/tokentracker.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.equal(wrapperSource.includes("/usr/bin/tokentracker"), false);
+  assert.equal(
+    wrapperSource.includes("/usr/lib/TokenTracker/_up_/target/release/backend"),
+    false
+  );
+});
 
 function createRuntime(overrides = {}) {
   const calls = {
