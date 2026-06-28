@@ -71,6 +71,21 @@ npm run tauri:build
 
 Outputs native installers for your platform (AppImage, `.deb`, `.msi`, etc.).
 
+### Linux npm install
+
+For Linux users, the recommended way to install TokenTracker is via npm:
+
+```bash
+npm install -g @thisisayande/tokentracker
+tokentracker
+```
+
+The npm package installs a Linux launcher. On first run it downloads the latest AppImage from GitHub Releases into the user's local app data directory and starts it. This npm flow is intended for Linux only.
+
+### Direct release downloads
+
+GitHub Releases provide native artifacts (`.deb`, AppImage, etc.) for users who prefer direct installation.
+
 ### Running Tests
 
 ```bash

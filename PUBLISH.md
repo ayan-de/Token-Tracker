@@ -3,8 +3,8 @@
 ## Overview
 
 TokenTracker is published in two places:
-- **GitHub Releases** — `.deb` installer for direct download
-- **npm** — `@thisisayande/tokentracker` package for `npm install -g`
+- **GitHub Releases** — native artifacts (`.deb`, AppImage, etc.) for direct download
+- **npm** — `@thisisayande/tokentracker` package — a Linux launcher for `npm install -g`
 
 Both are published automatically via the `Publish to npm` GitHub Actions workflow when a release is created.
 
@@ -32,9 +32,10 @@ All three must match the release version (e.g. `0.1.12`).
 npm run tauri:build
 ```
 
-This produces the installer at:
+This produces the installers at:
 ```
 target/release/bundle/deb/TokenTracker_<VERSION>_amd64.deb
+target/release/bundle/appimage/TokenTracker_<VERSION>_amd64.AppImage
 ```
 
 ### 2. Commit and push all changes
@@ -55,14 +56,17 @@ gh release create v0.x.x \
   --title "TokenTracker v0.x.x"
 ```
 
-### 4. Upload the .deb to the release
+### 4. Upload the .deb and AppImage to the release
 
 ```bash
 gh release upload v0.x.x \
   target/release/bundle/deb/TokenTracker_<VERSION>_amd64.deb \
+  target/release/bundle/appimage/TokenTracker_<VERSION>_amd64.AppImage \
   --repo ayan-de/Token-Tracker \
   --clobber
 ```
+
+Every release intended for npm users must include the AppImage asset.
 
 The `Publish to npm` workflow triggers automatically on release creation and publishes to npm.
 
@@ -78,7 +82,7 @@ npm install -g @thisisayande/tokentracker
 tokentracker
 ```
 
-On first run, the launcher downloads and installs the latest `.deb` from GitHub releases automatically.
+On first run, the launcher downloads the latest AppImage from GitHub Releases into the user's local app data directory and starts it.
 
 ---
 
