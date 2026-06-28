@@ -20,10 +20,16 @@ jobs:
       - name: Download .deb from GitHub release
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          ASSET_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION \
-            | jq -r '.assets[] | select(.name | contains("amd64.deb")) | .browser_download_url')
+          echo "VERSION=$VERSION"
+          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+          RELEASE_DATA=$(curl -s https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION)
+          echo "RELEASE_DATA=$RELEASE_DATA" | head -c 500
+          echo "---"
+          ASSET_URL=$(echo "$RELEASE_DATA" | jq -r '.assets[] | select(.name | contains("amd64.deb")) | .browser_download_url')
+          echo "ASSET_URL=$ASSET_URL"
           echo "Downloading: $ASSET_URL"
           curl -L -o release.deb "$ASSET_URL"
+          ls -la release.deb
 
       - name: Install npm dependencies
         run: npm ci
