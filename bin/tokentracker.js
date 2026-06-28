@@ -3,7 +3,6 @@ import { spawn } from "child_process";
 import https from "node:https";
 import fs from "node:fs";
 import os from "os";
-import path from "path";
 import { createLauncher } from "./lib/launcher.js";
 import {
   ensureStateDirectories,
