@@ -17,16 +17,25 @@ export function createLauncher({
         return;
       }
 
-      const cachedAppImagePath = runtime.getCachedAppImagePath();
+      await runtime.ensureStateDirectories();
+
+      const cachedAppImagePath = runtime.getInstalledAppImagePath();
       if (cachedAppImagePath) {
         await spawnAppImage(cachedAppImagePath);
         return;
       }
 
-      await installMissingAppImage({
+      const download = await installMissingAppImage({
         github,
         runtime,
       });
+
+      const installedAppImagePath = await runtime.installDownloadedAppImage({
+        sourcePath: download.filePath,
+        version: download.version,
+      });
+
+      await spawnAppImage(installedAppImagePath);
     },
   };
 }

@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "fs";
 
 import { createLauncher } from "../../bin/lib/launcher.js";
-import { INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE } from "../../bin/lib/constants.js";
 
 test("wrapper no longer encodes legacy installed system binary paths", () => {
   const wrapperSource = fs.readFileSync(
@@ -28,7 +27,12 @@ function createRuntime(overrides = {}) {
   const runtime = {
     args: [],
     env: {},
-    getCachedAppImagePath: () => null,
+    ensureStateDirectories: async () => {},
+    getInstalledAppImagePath: () => null,
+    installDownloadedAppImage: async () => {
+      throw new Error("installDownloadedAppImage not stubbed");
+    },
+    readInstalledVersion: () => null,
     error: (message) => calls.error.push(message),
     info: (message) => calls.info.push(message),
     exit: (code) => {
@@ -62,7 +66,7 @@ test("rejects non-Linux platforms", async () => {
 
 test("uses cached AppImage when available", async () => {
   const { runtime } = createRuntime({
-    getCachedAppImagePath: () => "/tmp/TokenTracker.AppImage",
+    getInstalledAppImagePath: () => "/tmp/TokenTracker.AppImage",
   });
   const spawnCalls = [];
   const launcher = createLauncher({
@@ -80,24 +84,35 @@ test("uses cached AppImage when available", async () => {
 });
 
 test("hands off missing AppImage installation through injected boundary", async () => {
-  const { runtime } = createRuntime();
+  const runtimeInstallCalls = [];
+  const { runtime } = createRuntime({
+    ensureStateDirectories: async () => {},
+    getInstalledAppImagePath: () => null,
+    installDownloadedAppImage: async ({ sourcePath, version }) => {
+      runtimeInstallCalls.push({ sourcePath, version });
+      return "/tmp/state/current/TokenTracker.AppImage";
+    },
+    readInstalledVersion: () => null,
+  });
   const installCalls = [];
+  const spawnCalls = [];
   const launcher = createLauncher({
     os: { platform: () => "linux" },
     runtime,
     github: {},
-    spawnAppImage: async () => {
-      throw new Error("spawn should not be called");
+    spawnAppImage: async (filePath) => {
+      spawnCalls.push(filePath);
     },
     installMissingAppImage: async (input) => {
       installCalls.push(input);
-      throw new Error(INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE);
+      return {
+        filePath: "/tmp/downloads/TokenTracker-0.1.11.AppImage",
+        version: "0.1.11",
+      };
     },
   });
 
-  await assert.rejects(launcher.run(), {
-    message: INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE,
-  });
+  await launcher.run();
 
   assert.deepEqual(installCalls, [
     {
@@ -105,4 +120,51 @@ test("hands off missing AppImage installation through injected boundary", async 
       runtime,
     },
   ]);
+  assert.deepEqual(runtimeInstallCalls, [
+    {
+      sourcePath: "/tmp/downloads/TokenTracker-0.1.11.AppImage",
+      version: "0.1.11",
+    },
+  ]);
+  assert.deepEqual(spawnCalls, ["/tmp/state/current/TokenTracker.AppImage"]);
+});
+
+test("installs first downloaded AppImage into user runtime and stores metadata", async () => {
+  const calls = [];
+  const { runtime } = createRuntime({
+    ensureStateDirectories: async () => {
+      calls.push(["ensureStateDirectories"]);
+    },
+    getInstalledAppImagePath: () => null,
+    readInstalledVersion: () => null,
+    installDownloadedAppImage: async ({ sourcePath, version }) => {
+      calls.push(["installDownloadedAppImage", sourcePath, version]);
+      return "/tmp/state/current/TokenTracker.AppImage";
+    },
+  });
+  const spawnCalls = [];
+  const launcher = createLauncher({
+    os: { platform: () => "linux" },
+    runtime,
+    github: {},
+    spawnAppImage: async (filePath) => {
+      spawnCalls.push(filePath);
+    },
+    installMissingAppImage: async () => ({
+      filePath: "/tmp/state/downloads/TokenTracker-0.1.11.AppImage",
+      version: "0.1.11",
+    }),
+  });
+
+  await launcher.run();
+
+  assert.deepEqual(calls, [
+    ["ensureStateDirectories"],
+    [
+      "installDownloadedAppImage",
+      "/tmp/state/downloads/TokenTracker-0.1.11.AppImage",
+      "0.1.11",
+    ],
+  ]);
+  assert.deepEqual(spawnCalls, ["/tmp/state/current/TokenTracker.AppImage"]);
 });
