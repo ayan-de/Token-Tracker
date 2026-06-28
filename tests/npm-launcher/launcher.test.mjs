@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "fs";
+import https from "node:https";
 
 import { createLauncher } from "../../bin/lib/launcher.js";
+import { getLatestVersion, getDesiredVersion, downloadReleaseAsset, normalizeArch } from "../../bin/lib/github.js";
 
 test("wrapper no longer encodes legacy installed system binary paths", () => {
   const wrapperSource = fs.readFileSync(
@@ -171,6 +173,135 @@ test("stores downloaded AppImage at concrete ~/.local/share/tokentracker/current
     assert.equal(versionContent.version, "0.1.11");
 
     assert.equal(runtimeModule.readInstalledVersion(fakeHome), "0.1.11");
+  } finally {
+    await fs.promises.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("normalizeArch maps x64 to amd64", () => {
+  assert.equal(normalizeArch("x64"), "amd64");
+});
+
+test("normalizeArch throws on unsupported architecture", () => {
+  assert.throws(() => normalizeArch("arm64"), /unsupported architecture/i);
+});
+
+test("normalizeArch passes through already-normalized arch", () => {
+  assert.equal(normalizeArch("amd64"), "amd64");
+});
+
+test("getDesiredVersion returns TOKEN_TRACKER_VERSION from env when set", async () => {
+  const env = { TOKEN_TRACKER_VERSION: "0.2.0" };
+  const getLatestVersion = async () => {
+    throw new Error("getLatestVersion should not be called");
+  };
+  const result = await getDesiredVersion({ env, getLatestVersion });
+  assert.equal(result, "0.2.0");
+});
+
+test("getDesiredVersion calls getLatestVersion when TOKEN_TRACKER_VERSION not set", async () => {
+  const env = {};
+  let getLatestCalled = false;
+  const getLatestVersion = async () => {
+    getLatestCalled = true;
+    return "0.1.11";
+  };
+  const result = await getDesiredVersion({ env, getLatestVersion });
+  assert.equal(result, "0.1.11");
+  assert.equal(getLatestCalled, true);
+});
+
+test("getLatestVersion fetches latest release tag from GitHub API", async () => {
+  const fakeHttps = {
+    request: (opts, callback) => {
+      assert.equal(opts.hostname, "api.github.com");
+      assert.equal(opts.path, "/repos/ayan-de/Token-Tracker/releases/latest");
+      const mockRes = {
+        statusCode: 200,
+        on: (event, cb) => {
+          if (event === "data") cb(JSON.stringify({ tag_name: "v0.1.11" }));
+          if (event === "end") cb();
+        },
+      };
+      callback(mockRes);
+      return { on: () => {}, end: () => {}, destroy: () => {} };
+    },
+  };
+  const version = await getLatestVersion({ https: fakeHttps });
+  assert.equal(version, "0.1.11");
+});
+
+test("downloadReleaseAsset constructs correct asset name TokenTracker_<version>_<arch>.AppImage", async () => {
+  const tmpDir = await fs.promises.mkdtemp(
+    import.meta.filename.includes("://") ? "/tmp/tokentracker-test-" : (await import("path")).join((await import("os")).tmpdir(), "tokentracker-test-")
+  );
+  try {
+    const fakeHttps = {
+      request: (opts, callback) => {
+        assert.match(opts.path, /TokenTracker_0\.1\.11_amd64\.AppImage/);
+        const mockRes = {
+          statusCode: 302,
+          headers: { location: "https://example.com/fake-download" },
+          on: () => {},
+        };
+        callback(mockRes);
+        return { on: () => {}, end: () => {}, destroy: () => {} };
+      },
+    };
+    const redirectsFollowed = [];
+    const fakeFollowRedirect = async (url) => {
+      redirectsFollowed.push(url);
+      const dlPath = import.meta.filename.includes("://") ? "/tmp/test.AppImage" : (await import("path")).join(tmpDir, "TokenTracker_0.1.11_amd64.AppImage");
+      await fs.promises.writeFile(dlPath, "#!/bin/sh\necho fake\n");
+      return dlPath;
+    };
+    const result = await downloadReleaseAsset({
+      version: "0.1.11",
+      arch: "amd64",
+      downloadsDir: tmpDir,
+      https: fakeHttps,
+      followRedirect: fakeFollowRedirect,
+    });
+    assert.equal(result.version, "0.1.11");
+    assert.match(result.filePath, /TokenTracker_0\.1\.11_amd64\.AppImage$/);
+  } finally {
+    await fs.promises.rm(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("downloadReleaseAsset cleans up partial download on failure", async () => {
+  const tmpDir = await fs.promises.mkdtemp(
+    import.meta.filename.includes("://") ? "/tmp/tokentracker-test-" : (await import("path")).join((await import("os")).tmpdir(), "tokentracker-test-")
+  );
+  try {
+    const fakeHttps = {
+      request: (opts, callback) => {
+        const mockRes = {
+          statusCode: 302,
+          headers: { location: "https://example.com/fake-download" },
+          on: () => {},
+        };
+        callback(mockRes);
+        return { on: () => {}, end: () => {}, destroy: () => {} };
+      },
+    };
+    const fakeFollowRedirect = async () => {
+      throw new Error("download failed");
+    };
+    const partialPath = import.meta.filename.includes("://") ? "/tmp/test.AppImage.download" : (await import("path")).join(tmpDir, "TokenTracker_0.1.11_amd64.AppImage.download");
+    await fs.promises.writeFile(partialPath, "partial");
+    await assert.rejects(
+      async () =>
+        downloadReleaseAsset({
+          version: "0.1.11",
+          arch: "amd64",
+          downloadsDir: tmpDir,
+          https: fakeHttps,
+          followRedirect: fakeFollowRedirect,
+        }),
+      /download failed/
+    );
+    assert.equal(fs.existsSync(partialPath), false);
   } finally {
     await fs.promises.rm(tmpDir, { recursive: true, force: true });
   }

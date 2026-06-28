@@ -1,14 +1,23 @@
 #!/usr/bin/env node
 import { spawn } from "child_process";
+import https from "node:https";
+import fs from "node:fs";
 import os from "os";
-import { INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE } from "./lib/constants.js";
+import path from "path";
 import { createLauncher } from "./lib/launcher.js";
 import {
   ensureStateDirectories,
   getInstalledAppImagePath,
   installDownloadedAppImage,
   readInstalledVersion,
+  getRuntimePaths,
 } from "./lib/runtime.js";
+import {
+  getLatestVersion,
+  getDesiredVersion,
+  downloadReleaseAsset,
+  normalizeArch,
+} from "./lib/github.js";
 
 function spawnInstalledBinary(binPath) {
   return new Promise((resolve) => {
@@ -24,8 +33,49 @@ function spawnInstalledBinary(binPath) {
   });
 }
 
-async function installMissingAppImage() {
-  throw new Error(INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE);
+function followRedirect(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+    https.get(url, (res) => {
+      if (res.statusCode === 200) {
+        res.pipe(file);
+        file.on("finish", () => {
+          file.close();
+          resolve(destPath);
+        });
+      } else {
+        file.close();
+        fs.promises.rm(destPath, { force: true }).catch(() => {});
+        reject(new Error(`Download failed with status ${res.statusCode}`));
+      }
+    }).on("error", (err) => {
+      file.close();
+      fs.promises.rm(destPath, { force: true }).catch(() => {});
+      reject(err);
+    });
+  });
+}
+
+async function installMissingAppImage({ runtime }) {
+  const archStr = os.arch() === "x64" ? "x64" : os.arch();
+  const arch = normalizeArch(archStr);
+  const version = await getDesiredVersion({
+    env: process.env,
+    getLatestVersion: () => getLatestVersion({ https }),
+  });
+  const { downloadsDir } = getRuntimePaths();
+  const normalizedArch = arch === "x64" ? "amd64" : arch;
+  const destPath = path.join(downloadsDir, `TokenTracker_${version}_${normalizedArch}.AppImage`);
+
+  const result = await downloadReleaseAsset({
+    version,
+    arch,
+    downloadsDir,
+    https,
+    followRedirect: (url) => followRedirect(url, destPath),
+  });
+
+  return { filePath: destPath, version };
 }
 
 const launcher = createLauncher({
