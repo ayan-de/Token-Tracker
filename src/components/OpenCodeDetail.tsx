@@ -216,7 +216,7 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
                 </svg>
                 <span className="text-xs font-semibold text-text-main mb-1">{activeTab.label}</span>
                 <span className="text-[11px] text-text-muted max-w-[240px]">
-                  Configure this provider in CodexBar settings to see real-time usage.
+                  Configure this provider in TokenTracker settings to see real-time usage.
                 </span>
               </div>
             )}

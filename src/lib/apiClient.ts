@@ -2,23 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 
 const DEFAULT_PORT = 46727;
 
-let _baseUrl: string | null = null;
-let _portPromise: Promise<string> | null = null;
-
 async function getBaseUrl(): Promise<string> {
-  if (_baseUrl) return _baseUrl;
-  if (!_portPromise) {
-    _portPromise = (async () => {
-      try {
-        const port: number = await invoke<number>("get_backend_port");
-        _baseUrl = `http://127.0.0.1:${port}`;
-      } catch {
-        _baseUrl = `http://127.0.0.1:${DEFAULT_PORT}`;
-      }
-      return _baseUrl;
-    })();
+  try {
+    const port: number = await invoke<number>("get_backend_port");
+    return `http://127.0.0.1:${port}`;
+  } catch {
+    return `http://127.0.0.1:${DEFAULT_PORT}`;
   }
-  return _portPromise;
 }
 
 export interface SyncPayload {

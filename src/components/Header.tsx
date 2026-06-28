@@ -14,7 +14,7 @@ export default function Header({ backendStatus, onRefresh, isRefreshing }: Heade
     <header className="flex items-center justify-between px-4 py-3 border-b border-white/5">
       <div className="flex items-center gap-3">
         <h1 className="text-base font-bold bg-gradient-to-r from-accent-cyan to-accent-purple bg-clip-text text-transparent font-outfit">
-          CodexBar
+          TokenTracker
         </h1>
         <StatusBadge status={backendStatus} />
       </div>

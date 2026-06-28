@@ -17,7 +17,7 @@ export default function AboutModal({ onClose }: AboutModalProps) {
         </div>
 
         <p className="text-xs text-text-muted/85 leading-relaxed font-outfit max-w-[260px] mx-auto">
-          A premium cross-platform port of CodexBar (TokenTracker) for monitoring LLM quota, rate limit, and spend statistics. Original macOS app by Peter Steinberger.
+          A cross-platform desktop application for monitoring LLM quota, rate limit, and spend statistics across multiple AI providers.
         </p>
 
         <button
