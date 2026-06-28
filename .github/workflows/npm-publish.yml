@@ -22,10 +22,9 @@ jobs:
 
       - name: Pack tarball
         run: |
-          mkdir -p dist
-          cp bin/tokentracker.js dist/tokentracker
-          chmod +x dist/tokentracker
-          tar -czvf dist/tokentracker.tar.gz -C dist .
+          cp bin/tokentracker.js tokentracker
+          chmod +x tokentracker
+          tar -czvf tokentracker.tar.gz tokentracker
 
       - name: Publish to npm
         run: npm publish
