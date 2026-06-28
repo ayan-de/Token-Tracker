@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "child_process";
 import os from "os";
+import { INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE } from "./lib/constants.js";
 import { createLauncher } from "./lib/launcher.js";
 
 function getCachedAppImagePath() {
@@ -21,6 +22,10 @@ function spawnInstalledBinary(binPath) {
   });
 }
 
+async function installMissingAppImage() {
+  throw new Error(INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE);
+}
+
 const launcher = createLauncher({
   os,
   runtime: {
@@ -33,6 +38,7 @@ const launcher = createLauncher({
   },
   github: {},
   spawnAppImage: spawnInstalledBinary,
+  installMissingAppImage,
 });
 
 launcher.run().catch((error) => {

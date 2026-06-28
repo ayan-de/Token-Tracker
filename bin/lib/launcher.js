@@ -1,9 +1,14 @@
 import {
-  INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE,
   LINUX_ONLY_MESSAGE,
 } from "./constants.js";
 
-export function createLauncher({ os, runtime, github, spawnAppImage }) {
+export function createLauncher({
+  os,
+  runtime,
+  github,
+  spawnAppImage,
+  installMissingAppImage,
+}) {
   return {
     async run() {
       if (os.platform() !== "linux") {
@@ -18,8 +23,10 @@ export function createLauncher({ os, runtime, github, spawnAppImage }) {
         return;
       }
 
-      void github;
-      throw new Error(INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE);
+      await installMissingAppImage({
+        github,
+        runtime,
+      });
     },
   };
 }

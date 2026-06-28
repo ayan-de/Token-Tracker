@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs";
 
 import { createLauncher } from "../../bin/lib/launcher.js";
+import { INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE } from "../../bin/lib/constants.js";
 
 test("wrapper no longer encodes legacy installed system binary paths", () => {
   const wrapperSource = fs.readFileSync(
@@ -78,8 +79,9 @@ test("uses cached AppImage when available", async () => {
   assert.deepEqual(spawnCalls, ["/tmp/TokenTracker.AppImage"]);
 });
 
-test("starts install orchestration when no cached AppImage exists", async () => {
+test("hands off missing AppImage installation through injected boundary", async () => {
   const { runtime } = createRuntime();
+  const installCalls = [];
   const launcher = createLauncher({
     os: { platform: () => "linux" },
     runtime,
@@ -87,9 +89,20 @@ test("starts install orchestration when no cached AppImage exists", async () => 
     spawnAppImage: async () => {
       throw new Error("spawn should not be called");
     },
+    installMissingAppImage: async (input) => {
+      installCalls.push(input);
+      throw new Error(INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE);
+    },
   });
 
-  await launcher.run();
+  await assert.rejects(launcher.run(), {
+    message: INSTALL_FLOW_NOT_IMPLEMENTED_MESSAGE,
+  });
 
-  assert.equal(runtime.installFlowStarted, true);
+  assert.deepEqual(installCalls, [
+    {
+      github: {},
+      runtime,
+    },
+  ]);
 });
