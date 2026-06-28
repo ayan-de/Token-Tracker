@@ -59,7 +59,6 @@ export async function downloadReleaseAsset({
   followRedirect,
 }) {
   const fileName = `${APP_NAME}_${version}_${arch}${APPIMAGE_EXT}`;
-  const partialPath = `${downloadsDir}/${fileName}.download`;
   const finalPath = `${downloadsDir}/${fileName}`;
 
   try {
@@ -86,23 +85,10 @@ export async function downloadReleaseAsset({
       req.end();
     });
 
-    const downloadedPath = await followRedirect(redirectUrl, partialPath);
-
-    const writeStream = fs.createWriteStream(partialPath);
-    const readStream = fs.createReadStream(downloadedPath);
-
-    await new Promise((resolve, reject) => {
-      readStream.pipe(writeStream);
-      writeStream.on("finish", resolve);
-      writeStream.on("error", reject);
-      readStream.on("error", reject);
-    });
-
-    await fs.promises.rm(downloadedPath, { force: true });
-    await fs.promises.rename(partialPath, finalPath);
+    await followRedirect(redirectUrl, finalPath);
   } catch (err) {
     try {
-      await fs.promises.rm(partialPath, { force: true });
+      await fs.promises.rm(finalPath, { force: true });
     } catch {}
     throw err;
   }

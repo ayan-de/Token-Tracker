@@ -269,7 +269,7 @@ test("downloadReleaseAsset constructs correct asset name TokenTracker_<version>_
   }
 });
 
-test("downloadReleaseAsset cleans up partial download on failure", async () => {
+test("downloadReleaseAsset cleans up downloaded file on failure", async () => {
   const tmpDir = await fs.promises.mkdtemp(
     import.meta.filename.includes("://") ? "/tmp/tokentracker-test-" : (await import("path")).join((await import("os")).tmpdir(), "tokentracker-test-")
   );
@@ -288,8 +288,8 @@ test("downloadReleaseAsset cleans up partial download on failure", async () => {
     const fakeFollowRedirect = async () => {
       throw new Error("download failed");
     };
-    const partialPath = import.meta.filename.includes("://") ? "/tmp/test.AppImage.download" : (await import("path")).join(tmpDir, "TokenTracker_0.1.11_amd64.AppImage.download");
-    await fs.promises.writeFile(partialPath, "partial");
+    const finalPath = import.meta.filename.includes("://") ? "/tmp/test.AppImage" : (await import("path")).join(tmpDir, "TokenTracker_0.1.11_amd64.AppImage");
+    await fs.promises.writeFile(finalPath, "partial");
     await assert.rejects(
       async () =>
         downloadReleaseAsset({
@@ -301,7 +301,7 @@ test("downloadReleaseAsset cleans up partial download on failure", async () => {
         }),
       /download failed/
     );
-    assert.equal(fs.existsSync(partialPath), false);
+    assert.equal(fs.existsSync(finalPath), false);
   } finally {
     await fs.promises.rm(tmpDir, { recursive: true, force: true });
   }

@@ -64,18 +64,16 @@ async function installMissingAppImage({ github, runtime }) {
     getLatestVersion: () => github.getLatestVersion({ https }),
   });
   const { downloadsDir } = getRuntimePaths();
-  const normalizedArch = arch === "x64" ? "amd64" : arch;
-  const destPath = path.join(downloadsDir, `TokenTracker_${version}_${normalizedArch}.AppImage`);
 
   const result = await github.downloadReleaseAsset({
     version,
     arch,
     downloadsDir,
     https,
-    followRedirect: (url) => followRedirect(url, destPath),
+    followRedirect,
   });
 
-  return { filePath: destPath, version };
+  return result;
 }
 
 const launcher = createLauncher({
