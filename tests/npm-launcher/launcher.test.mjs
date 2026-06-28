@@ -2,9 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "fs";
 import https from "node:https";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import { createLauncher } from "../../bin/lib/launcher.js";
 import { getLatestVersion, getDesiredVersion, downloadReleaseAsset, normalizeArch } from "../../bin/lib/github.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 test("wrapper no longer encodes legacy installed system binary paths", () => {
   const wrapperSource = fs.readFileSync(
@@ -345,4 +349,24 @@ test("installs first downloaded AppImage into user runtime and stores metadata",
     ],
   ]);
   assert.deepEqual(spawnCalls, ["/tmp/state/current/TokenTracker.AppImage"]);
+});
+
+test("package.json has no postinstall script", async () => {
+  const packageJsonPath = path.resolve(__dirname, "../../package.json");
+  const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf8"));
+  assert.equal(packageJson.postinstall, undefined);
+});
+
+test("package.json files array contains only bin/", async () => {
+  const packageJsonPath = path.resolve(__dirname, "../../package.json");
+  const packageJson = JSON.parse(await fs.promises.readFile(packageJsonPath, "utf8"));
+  assert.deepEqual(packageJson.files, ["bin/"]);
+});
+
+test("helper modules are importable from the published bin tree", async () => {
+  const constantsPath = path.resolve(__dirname, "../../bin/lib/constants.js");
+  const constants = await import(`file://${constantsPath}`);
+  assert.equal(typeof constants.APP_NAME, "string");
+  assert.equal(constants.APP_NAME, "TokenTracker");
+  assert.equal(typeof constants.getAppImageAssetName, "function");
 });

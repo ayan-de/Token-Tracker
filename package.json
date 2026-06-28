@@ -19,8 +19,7 @@
     "postinstall": "node scripts/postinstall.js"
   },
   "files": [
-    "bin/",
-    "dist/"
+    "bin/"
   ],
   "publishConfig": {
     "access": "public",
