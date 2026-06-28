@@ -4,32 +4,32 @@ import path from "path";
 
 import { APP_NAME, APPIMAGE_EXT } from "./constants.js";
 
-const STATE_DIR = path.join(os.homedir(), ".local", "share", "tokentracker");
-const CURRENT_DIR = path.join(STATE_DIR, "current");
-const DOWNLOADS_DIR = path.join(STATE_DIR, "downloads");
-const CURRENT_APPIMAGE_PATH = path.join(CURRENT_DIR, `${APP_NAME}${APPIMAGE_EXT}`);
-const CURRENT_VERSION_PATH = path.join(CURRENT_DIR, "version.json");
+export function getRuntimePaths(homedir = os.homedir()) {
+  const stateDir = path.join(homedir, ".local", "share", "tokentracker");
+  const currentDir = path.join(stateDir, "current");
+  const downloadsDir = path.join(stateDir, "downloads");
+  const currentAppImagePath = path.join(currentDir, `${APP_NAME}${APPIMAGE_EXT}`);
+  const currentVersionPath = path.join(currentDir, "version.json");
 
-export function getRuntimePaths() {
   return {
-    stateDir: STATE_DIR,
-    currentDir: CURRENT_DIR,
-    downloadsDir: DOWNLOADS_DIR,
-    currentAppImagePath: CURRENT_APPIMAGE_PATH,
-    currentVersionPath: CURRENT_VERSION_PATH,
+    stateDir,
+    currentDir,
+    downloadsDir,
+    currentAppImagePath,
+    currentVersionPath,
   };
 }
 
-export async function ensureStateDirectories() {
-  const { stateDir, currentDir, downloadsDir } = getRuntimePaths();
+export async function ensureStateDirectories(homedir = os.homedir()) {
+  const { stateDir, currentDir, downloadsDir } = getRuntimePaths(homedir);
 
   await fs.promises.mkdir(stateDir, { recursive: true });
   await fs.promises.mkdir(currentDir, { recursive: true });
   await fs.promises.mkdir(downloadsDir, { recursive: true });
 }
 
-export function getInstalledAppImagePath() {
-  const { currentAppImagePath } = getRuntimePaths();
+export function getInstalledAppImagePath(homedir = os.homedir()) {
+  const { currentAppImagePath } = getRuntimePaths(homedir);
 
   if (!fs.existsSync(currentAppImagePath)) {
     return null;
@@ -38,27 +38,46 @@ export function getInstalledAppImagePath() {
   return currentAppImagePath;
 }
 
-export function readInstalledVersion() {
-  const { currentVersionPath } = getRuntimePaths();
+export function readInstalledVersion(homedir = os.homedir()) {
+  const { currentVersionPath } = getRuntimePaths(homedir);
 
   if (!fs.existsSync(currentVersionPath)) {
     return null;
   }
 
-  const metadata = JSON.parse(fs.readFileSync(currentVersionPath, "utf8"));
+  let metadata;
+  try {
+    metadata = JSON.parse(fs.readFileSync(currentVersionPath, "utf8"));
+  } catch {
+    return null;
+  }
   return typeof metadata.version === "string" ? metadata.version : null;
 }
 
-export async function installDownloadedAppImage({ sourcePath, version }) {
-  const { currentAppImagePath, currentVersionPath } = getRuntimePaths();
+export async function installDownloadedAppImage({ sourcePath, version, homedir = os.homedir() }) {
+  const { currentDir, currentAppImagePath, currentVersionPath } = getRuntimePaths(homedir);
 
-  await fs.promises.copyFile(sourcePath, currentAppImagePath);
-  await fs.promises.chmod(currentAppImagePath, 0o755);
-  await fs.promises.writeFile(
-    currentVersionPath,
-    JSON.stringify({ version }, null, 2) + "\n",
-    "utf8"
-  );
+  await fs.promises.mkdir(currentDir, { recursive: true });
+
+  const tmpAppImagePath = `${currentAppImagePath}.tmp.${Date.now()}`;
+  const tmpVersionPath = `${currentVersionPath}.tmp.${Date.now()}`;
+
+  try {
+    await fs.promises.copyFile(sourcePath, tmpAppImagePath);
+    await fs.promises.chmod(tmpAppImagePath, 0o755);
+    await fs.promises.writeFile(
+      tmpVersionPath,
+      JSON.stringify({ version }, null, 2) + "\n",
+      "utf8"
+    );
+
+    await fs.promises.rename(tmpAppImagePath, currentAppImagePath);
+    await fs.promises.rename(tmpVersionPath, currentVersionPath);
+  } catch (err) {
+    await fs.promises.rm(tmpAppImagePath, { force: true });
+    await fs.promises.rm(tmpVersionPath, { force: true });
+    throw err;
+  }
 
   return currentAppImagePath;
 }

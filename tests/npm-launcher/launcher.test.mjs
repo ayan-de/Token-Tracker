@@ -140,27 +140,25 @@ test("stores downloaded AppImage at concrete ~/.local/share/tokentracker/current
   const fakeHome = path.join(tmpDir, "fakehome");
   await fs.promises.mkdir(fakeHome, { recursive: true });
 
-  const originalHome = process.env.HOME;
-  process.env.HOME = fakeHome;
-
   let runtimeModule;
   try {
-    const { ensureStateDirectories, installDownloadedAppImage, getRuntimePaths } =
+    const { ensureStateDirectories, installDownloadedAppImage, getRuntimePaths, readInstalledVersion } =
       await import("../../bin/lib/runtime.js");
-    runtimeModule = { ensureStateDirectories, installDownloadedAppImage, getRuntimePaths };
+    runtimeModule = { ensureStateDirectories, installDownloadedAppImage, getRuntimePaths, readInstalledVersion };
 
     const srcAppImage = path.join(tmpDir, "TokenTracker-0.1.11.AppImage");
     await fs.promises.writeFile(srcAppImage, "#!/bin/sh\necho fake\n");
     await fs.promises.chmod(srcAppImage, 0o755);
 
-    await runtimeModule.ensureStateDirectories();
+    await runtimeModule.ensureStateDirectories(fakeHome);
 
     const result = await runtimeModule.installDownloadedAppImage({
       sourcePath: srcAppImage,
       version: "0.1.11",
+      homedir: fakeHome,
     });
 
-    const { currentAppImagePath, currentVersionPath } = runtimeModule.getRuntimePaths();
+    const { currentAppImagePath, currentVersionPath } = runtimeModule.getRuntimePaths(fakeHome);
 
     assert.equal(result, currentAppImagePath);
 
@@ -171,8 +169,9 @@ test("stores downloaded AppImage at concrete ~/.local/share/tokentracker/current
       await fs.promises.readFile(currentVersionPath, "utf8")
     );
     assert.equal(versionContent.version, "0.1.11");
+
+    assert.equal(runtimeModule.readInstalledVersion(fakeHome), "0.1.11");
   } finally {
-    process.env.HOME = originalHome;
     await fs.promises.rm(tmpDir, { recursive: true, force: true });
   }
 });
