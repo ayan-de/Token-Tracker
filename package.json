@@ -1,6 +1,6 @@
 {
   "name": "@thisisayande/tokentracker",
-  "version": "0.1.6",
+  "version": "0.1.11",
   "private": false,
   "type": "module",
   "description": "AI Provider Quota Monitor - track usage, rate limits, and spend across 40+ LLM providers",
