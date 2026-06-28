@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-TokenTracker is a cross-platform Tauri desktop application (Linux/Windows) that monitors AI provider quotas, rate limits, and spend statistics by wrapping the CodexBar CLI. The UI is a macOS-inspired popover with a glassmorphic design, dark/light theme support, and a collapsible CLI terminal drawer.
+TokenTracker is a cross-platform Tauri desktop application (Linux/Windows) that monitors AI provider quotas, rate limits, and spend statistics. It uses a self-contained Rust HTTP backend that runs as a bundled subprocess, communicating with the frontend over HTTP on localhost.
 
 ## Tech Stack
 
 - **Frontend**: Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, custom CSS variables for theming
-- **Backend**: Rust with Tauri 2 (system tray, window management)
-- **State/Data**: Local cache at `~/.codexbar-desktop/cache.json`; 60-second polling interval
+- **Backend**: Self-contained Rust HTTP API server (Axum), bundled as a subprocess
+- **Desktop Runtime**: Tauri 2 (system tray, window management, process lifecycle)
+- **State/Data**: Local cache at `~/.config/CodexBar/cache.json`; configurable polling interval
 
 ## Commands
 
@@ -27,40 +28,46 @@ Static export is configured: frontend builds to `out/`, Tauri consumes it from t
 ### Data Flow
 
 ```
-CodexBar CLI (codexbar usage/cost --json)
-  → Rust: parse, merge with cache, write ~/.codexbar-desktop/cache.json
-  → Tauri event: "data-synced" payload
-  → React: useCodexBar hook listens via onDataSynced()
-  → Components: mapCLIUsage/mapCLICost transform raw JSON to typed objects
+Frontend (Tauri/Next.js)
+  → HTTP (localhost:46727) → Rust Backend (Axum API)
+  → useProviders hook subscribes and manages all state
+  → mapProviderUsage / mapProviderCost transform raw JSON → typed objects
 ```
 
 ### Key Files
 
-- `src-tauri/src/lib.rs` — All Rust backend logic: CLI path detection, provider discovery, cache read/write, `trigger_refresh` spawns async task and emits events. On Linux, clears `LD_LIBRARY_PATH` and `LD_PRELOAD` before spawning CLI to avoid AppImage dynamic linker conflicts.
-- `src/lib/tauri.ts` — Tauri `invoke` wrappers for all commands
-- `src/lib/tauriEvents.ts` — Tauri event listeners (`onDataSynced`, `onSyncError`)
-- `src/hooks/useCodexBar.ts` — Central React hook; owns all provider/cost state, polling, error handling
-- `src/lib/dataMapping.ts` — `mapCLIUsage`/`mapCLICost` transform raw CLI JSON → typed objects; `PROVIDER_DESCRIPTORS` defines display names, logos, rate window labels per provider
+- `backend/src/main.rs` — Rust HTTP server entry point (Axum router)
+- `backend/src/server/` — Request handlers for all API endpoints
+- `src-tauri/src/lib.rs` — Tauri app lifecycle: tray icon, window management, backend process management
+- `src-tauri/src/backend.rs` — Backend process spawning, health check, lifecycle management. On Linux, clears `LD_LIBRARY_PATH` and `LD_PRELOAD` before spawning to avoid AppImage dynamic linker conflicts.
+- `src/lib/apiClient.ts` — Frontend HTTP client; fetches backend port dynamically via Tauri invoke
+- `src/hooks/useProviders.ts` — Central React hook; owns all provider/cost/settings state, polling, error handling
+- `src/lib/dataMapping.ts` — `mapProviderUsage`/`mapProviderCost` transform raw backend JSON → typed objects; `PROVIDER_DESCRIPTORS` defines display names, logos, rate window labels per provider
 - `src/app/page.tsx` — Root page; composes all UI sections, owns theme/modal state
 
-### Rust Command Handlers
+### Tauri Commands
 
 | Command | Purpose |
 |---|---|
-| `get_cli_status` | Returns `{"status": "available"\|"not_installed"\|"demo"}` |
-| `trigger_refresh` | Runs `codexbar usage --json` + `cost --json`, caches result, emits `data-synced` event |
-| `get_usage_data` | Returns cached usage array |
-| `get_cost_data` | Returns cached cost array |
-| `run_codexbar_command` | Arbitrary CLI invocation (for terminal drawer) |
-| `install_cli` | Downloads+installs CodexBar CLI from GitHub to `~/.local/bin` |
+| `get_backend_port` | Returns the port the backend HTTP server is listening on |
+| `quit_app` | Exits the application cleanly |
 
-### Caching & Stale Data
+### API Endpoints (handled by Rust backend)
 
-The Rust layer merges fresh CLI responses with cached data. When a provider errors but previously succeeded, the stale cached usage is shown with an error indicator rather than being hidden. See `merge_usage_with_cache` in `lib.rs`.
-
-### Provider Detection
-
-Providers are detected by checking if their CLI executable exists on PATH. See `detect_installed_providers` and `PROVIDER_COMMANDS` constant in `lib.rs`.
+```
+GET  /health
+GET  /api/v1/providers
+GET  /api/v1/providers/{id}
+POST /api/v1/providers/refresh
+GET  /api/v1/cost
+GET  /api/v1/credentials
+POST /api/v1/credentials
+DEL  /api/v1/credentials/{id}
+GET  /api/v1/settings
+PUT  /api/v1/settings
+GET  /api/v1/browsers
+POST /api/v1/browsers/import
+```
 
 ## Logo System
 
@@ -81,43 +88,16 @@ providerLogo(provider: string, theme: 'dark' | 'light'): string
 - `src/app/page.tsx` — Root page; tab switcher, provider detail area, theme/modal state
 - `src/components/ProviderDetail.tsx` — Selected provider's rate windows, cost breakdown, account info; receives `theme` prop for logo variant
 - `StatusBadge`, `ProgressBar`, `CostCard`, `ProviderCard` — Reusable display components
-- `CLITerminal` — Collapsible terminal drawer for running arbitrary CLI commands
-- `InstallOverlay` — Shown when CodexBar CLI is not detected
+- `SettingsModal` — Settings, credentials management, browser cookie import
 
 ## Theme System
 
 Dark mode is default. CSS variables defined in `globals.css` under `:root`; light mode overrides them under `:root.light-mode`. Theme preference persists to `localStorage`. The theme state lives in `src/app/page.tsx` and is passed down as a prop to components that need themed logos.
 
-## Backend Architecture (Planned Migration)
+## Backend Lifecycle
 
-The backend will be migrated to a self-contained Rust HTTP API server (copied from Win-CodexBar), replacing the current CLI-wrapping approach.
+The backend is spawned as a child process by the Tauri app on startup and managed via `src-tauri/src/backend.rs`. The frontend connects to it over HTTP on a dynamically-assigned port (default 46727). On exit, the Tauri app cleanly terminates the backend process.
 
-```
-Desktop UI (Tauri/Next.js) ──HTTP──▶  Rust Backend (localhost)
-Mobile UI (future)         ──HTTP──▶  Rust Backend (localhost)
-```
+## Cache & Stale Data
 
-**Key files after migration:**
-- `backend/` — Rust HTTP API server (Win-CodexBar provider logic copied here)
-- `src-tauri/src/backend.rs` — spawns and manages backend process lifecycle
-- `src/lib/apiClient.ts` — HTTP client for backend API (replaces `tauri.ts`)
-- `src/lib/tauri.ts` — REMOVED after migration
-
-See `docs/superpowers/plans/2026-06-23-backend-migration-self-contained.md` for the full migration plan.
-See `docs/superpowers/plans/2026-06-23-feature-roadmap.md` for the full feature vision (global hotkey, floating bar, notifications, persisted settings, login flows, multi-account, and more).
-
-### API Endpoints (target)
-
-```
-GET  /api/v1/providers
-GET  /api/v1/providers/{id}
-POST /api/v1/providers/refresh
-GET  /api/v1/cost
-GET  /api/v1/credentials
-POST /api/v1/credentials
-DEL  /api/v1/credentials/{id}
-GET  /api/v1/settings
-PUT  /api/v1/settings
-GET  /api/v1/browsers
-POST /api/v1/browsers/import
-```
+The Rust backend caches usage/cost data at `~/.config/CodexBar/cache.json`. When a provider errors but previously succeeded, the stale cached usage is shown with an error indicator rather than being hidden.
