@@ -21,7 +21,7 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           ASSET_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/tags/v$VERSION \
-            | jq -r '.assets[] | select(.name | test("amd64\\.deb$")) | .browser_download_url')
+            | jq -r '.assets[] | select(.name | contains("amd64.deb")) | .browser_download_url')
           echo "Downloading: $ASSET_URL"
           curl -L -o release.deb "$ASSET_URL"
 
