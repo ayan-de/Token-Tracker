@@ -32,3 +32,7 @@ dist-ssr
 /src-tauri/target/
 /src-tauri/gen/
 
+
+# Next.js build artifacts
+next-env.d.ts
+tsconfig.tsbuildinfo
