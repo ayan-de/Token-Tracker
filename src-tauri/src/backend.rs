@@ -12,7 +12,7 @@ pub struct BackendState {
     pub port: u16,
 }
 
-const DEFAULT_PORT: u16 = 46727;
+pub(crate) const DEFAULT_PORT: u16 = 46727;
 
 /// Resolve the path to the backend executable
 fn resolve_backend_path(app: &tauri::App) -> Option<PathBuf> {
@@ -33,6 +33,11 @@ fn resolve_backend_path(app: &tauri::App) -> Option<PathBuf> {
             if candidate.exists() {
                 return Some(candidate);
             }
+            // Also check target/release/backend (development layout)
+            let candidate = parent.join("target").join("release").join(bin_name);
+            if candidate.exists() {
+                return Some(candidate);
+            }
         }
     }
 
@@ -43,6 +48,16 @@ fn resolve_backend_path(app: &tauri::App) -> Option<PathBuf> {
             return Some(candidate);
         }
         let candidate = resource_dir.join(bin_name);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        // Check _up_/target/release/backend (AppImage/.deb layout)
+        let candidate = resource_dir.join("_up_").join("target").join("release").join(bin_name);
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        // Check _up_/backend directly under resource dir
+        let candidate = resource_dir.join("_up_").join(bin_name);
         if candidate.exists() {
             return Some(candidate);
         }

@@ -10,8 +10,9 @@ fn quit_app(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn get_backend_port(app: tauri::AppHandle) -> u16 {
-    app.state::<backend::BackendState>()
-        .port
+    app.try_state::<backend::BackendState>()
+        .map(|s| s.port)
+        .unwrap_or(backend::DEFAULT_PORT)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
