@@ -15,8 +15,7 @@
     "tauri:build": "next build && tauri build",
     "test:npm-launcher": "node --test tests/npm-launcher/launcher.test.mjs",
     "test:smoke": "playwright test",
-    "test:smoke:ui": "playwright test --ui",
-    "postinstall": "node scripts/postinstall.js"
+    "test:smoke:ui": "playwright test --ui"
   },
   "files": [
     "bin/"
