@@ -32,7 +32,7 @@ export const PROVIDER_DESCRIPTORS: Record<string, ProviderDescriptor> = {
   mistral:    { displayName: "Mistral",    logo: "/logos/mistral.svg",         sessionLabel: "Monthly", weeklyLabel: "" },
   deepseek:   { displayName: "DeepSeek",  logo: "/logos/deepseek.svg",        sessionLabel: "Balance", weeklyLabel: "Balance" },
   groq:       { displayName: "Groq",       logo: "",                          sessionLabel: "Requests", weeklyLabel: "Tokens" },
-  grok:       { displayName: "Grok",       logo: "",                          sessionLabel: "Credits", weeklyLabel: "On-demand" },
+  grok:       { displayName: "Grok",       logo: "/logos/grok.svg",       logoDark: "/logos/grok-dark.svg", sessionLabel: "Credits", weeklyLabel: "On-demand" },
   opencode:   { displayName: "OpenCode",   logo: "/logos/opencode.svg",                          sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   opencodego: { displayName: "OpenCode Go",logo: "/logos/opencode.svg",      sessionLabel: "5-hour", weeklyLabel: "Weekly" },
   factory:    { displayName: "Factory",    logo: "",                          sessionLabel: "Standard", weeklyLabel: "Premium" },
