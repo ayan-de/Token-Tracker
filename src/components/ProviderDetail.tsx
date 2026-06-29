@@ -4,7 +4,6 @@ import { memo } from "react";
 import type { ProviderUsage, CostItem } from "@/lib/types";
 import ProviderStatus from "./ProviderStatus";
 import LimitStatusBars from "./LimitStatusBars";
-import LimitLineGraph from "./LimitLineGraph";
 import CreditsCost from "./CreditsCost";
 import ActionMenu from "./ActionMenu";
 import ErrorBoundary from "./ErrorBoundary";
@@ -23,7 +22,6 @@ export default memo(function ProviderDetail({
 
   const statusLoader = <div className="animate-pulse h-16 bg-[var(--color-border)] rounded-lg" />;
   const limitLoader = <div className="animate-pulse h-24 bg-[var(--color-border)] rounded-lg" />;
-  const graphLoader = <div className="animate-pulse h-40 bg-[var(--color-border)] rounded-lg" />;
   const costLoader = <div className="animate-pulse h-20 bg-[var(--color-border)] rounded-lg" />;
 
   return (
@@ -42,9 +40,6 @@ export default memo(function ProviderDetail({
         />
       </ErrorBoundary>
 
-      <ErrorBoundary loader={graphLoader}>
-        <LimitLineGraph provider={provider} />
-      </ErrorBoundary>
 
       <ErrorBoundary loader={costLoader}>
         <CreditsCost
