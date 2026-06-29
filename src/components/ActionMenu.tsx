@@ -15,6 +15,7 @@ export const PROVIDER_URLS: Record<string, { dashboard: string; statusPage: stri
   openrouter: { dashboard: "https://openrouter.ai/activity", statusPage: "https://status.openrouter.ai/" },
   deepseek: { dashboard: "https://platform.deepseek.com/usage", statusPage: "https://status.deepseek.com/" },
   groq: { dashboard: "https://console.groq.com/usage", statusPage: "https://status.groq.com/" },
+  grok: { dashboard: "https://grok.com/?_s=usage", statusPage: "https://status.x.ai" },
   ollama: { dashboard: "http://localhost:11434/", statusPage: "https://github.com/ollama/ollama" },
 };
 
