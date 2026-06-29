@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PROVIDER_DESCRIPTORS, providerLogo, CredentialField } from "@/lib/dataMapping";
-import { Trash2, Check } from "@/lib/icons";
+import { Trash2 } from "@/lib/icons";
 import { useTheme } from "@/app/page";
 
 interface SettingsModalProps {
@@ -247,12 +247,12 @@ export default function SettingsModal({
                         <div className="w-1.5 h-1.5 rounded-full bg-accent-blue" />
                       )}
                       <div className="flex items-center justify-between flex-1 min-w-0">
-                        <span className="text-[11px] font-medium text-text-main truncate">
+                        <span className="text-[11px] font-medium text-text-main truncate flex items-center gap-1">
                           {desc.displayName}
+                          {installedProviders.includes(id) && (
+                            <img src="/logos/blueTick.svg" className="w-3 h-3 flex-shrink-0" alt="installed" />
+                          )}
                         </span>
-                        {installedProviders.includes(id) && (
-                          <Check className="w-3 h-3 text-accent-blue flex-shrink-0" />
-                        )}
                       </div>
                     </label>
                   );
