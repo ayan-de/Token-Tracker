@@ -52,6 +52,7 @@ const LOGO_FILE: Record<string, string> = {
   deepseek: "deepseek",
   openai: "openai",
   windsurf: "windsurf_light",
+  grok: "grok",
 };
 
 // Extracted at build-time via scripts/extract-logo-colors.js — do not edit manually
@@ -72,6 +73,7 @@ const LOGO_GRADIENTS: Partial<Record<string, string>> = {
   opencode: "from-[#CFCECD] to-[#211E1E]",
   openrouter: "from-[#d09139] to-[#a6742e]",
   windsurf: "from-[#d03970] to-[#a62e5a]",
+  grok: "from-[#f3f4f6] to-[#6b7280]",
 };
 
 // Fallback for providers with no SVG: deterministic hue from provider name
