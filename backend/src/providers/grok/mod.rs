@@ -30,8 +30,8 @@ impl GrokProvider {
             metadata: ProviderMetadata {
                 id: ProviderId::Grok,
                 display_name: "Grok",
-                session_label: "Credits",
-                weekly_label: "On-demand",
+                session_label: "Weekly",
+                weekly_label: "Credits",
                 supports_opus: false,
                 supports_credits: false,
                 default_enabled: false,
@@ -71,13 +71,13 @@ impl GrokProvider {
         let billing = self
             .fetch_billing(Some(format!("Bearer {}", credentials.access_token)), None)
             .await?;
-        Ok(result_from_billing(
+        result_from_billing(
             billing,
             "grok-web",
             credentials.email.clone(),
             credentials.team_id.clone(),
             credentials.login_method(),
-        ))
+        )
     }
 
     async fn fetch_with_cookie(
@@ -87,13 +87,7 @@ impl GrokProvider {
         let billing = self
             .fetch_billing(None, Some(cookie_header.to_string()))
             .await?;
-        Ok(result_from_billing(
-            billing,
-            "grok-browser",
-            None,
-            None,
-            None,
-        ))
+        result_from_billing(billing, "grok-browser", None, None, None)
     }
 
     async fn fetch_billing(
@@ -305,8 +299,19 @@ fn text_field(value: &Value, key: &str) -> Option<String> {
 
 #[derive(Debug, Clone, Copy)]
 struct GrokBillingSnapshot {
-    used_percent: f64,
-    resets_at: Option<DateTime<Utc>>,
+    /// `creditUsagePercent` on a weekly billing period.
+    weekly_percent: Option<f64>,
+    /// Included subscription usage against the monthly cap (cents-based).
+    monthly_percent: Option<f64>,
+    /// Prepaid / top-up balance still available (`prepaidBalance.val`).
+    prepaid_balance: Option<f64>,
+    /// Pay-as-you-go cap and consumption (`onDemandCap` / `onDemandUsed`).
+    on_demand_cap: Option<f64>,
+    on_demand_used: Option<f64>,
+    /// Billing period end for the active allowance window.
+    period_end: Option<DateTime<Utc>>,
+    /// True when protobuf field 11 reports `USAGE_PERIOD_TYPE_WEEKLY`.
+    is_weekly_period: bool,
 }
 
 fn result_from_billing(
@@ -315,13 +320,118 @@ fn result_from_billing(
     email: Option<String>,
     team_id: Option<String>,
     login_method: Option<String>,
+) -> Result<ProviderFetchResult, ProviderError> {
+    let mut usage = UsageSnapshot::new(RateWindow::new(0.0));
+
+    if let Some(weekly_percent) = billing
+        .weekly_percent
+        .filter(|percent| billing.is_weekly_period && percent.is_finite())
+    {
+        usage = UsageSnapshot::new(RateWindow::with_details(
+            weekly_percent,
+            Some(10_080),
+            billing.period_end,
+            None,
+        ));
+    } else if let Some(monthly_percent) = billing
+        .monthly_percent
+        .filter(|percent| percent.is_finite())
+    {
+        usage = UsageSnapshot::new(RateWindow::with_details(
+            monthly_percent,
+            Some(43_200),
+            billing.period_end,
+            None,
+        ));
+    } else if let Some(credit_percent) = billing
+        .weekly_percent
+        .filter(|percent| percent.is_finite())
+    {
+        usage = UsageSnapshot::new(RateWindow::with_details(
+            credit_percent,
+            Some(43_200),
+            billing.period_end,
+            None,
+        ));
+    } else if let Some(prepaid_balance) = billing
+        .prepaid_balance
+        .filter(|balance| balance.is_finite() && *balance > 0.0)
+    {
+        usage = UsageSnapshot::new(prepaid_credits_window(prepaid_balance));
+    }
+
+    if let Some(prepaid_balance) = billing
+        .prepaid_balance
+        .filter(|balance| balance.is_finite() && *balance > 0.0)
+        .filter(|_| billing.is_weekly_period || billing.monthly_percent.is_some())
+    {
+        usage = usage.with_secondary(prepaid_credits_window(prepaid_balance));
+    }
+
+    if let Some(monthly_percent) = billing
+        .monthly_percent
+        .filter(|percent| percent.is_finite())
+        .filter(|_| billing.is_weekly_period)
+    {
+        usage = usage.with_tertiary(RateWindow::with_details(
+            monthly_percent,
+            Some(43_200),
+            billing.period_end,
+            None,
+        ));
+    }
+
+    if let Some(on_demand_percent) = billing.on_demand_percent() {
+        usage = usage.with_extra_rate_window(
+            "grok-on-demand",
+            "On-demand",
+            RateWindow::with_details(on_demand_percent, None, None, None),
+        );
+    }
+
+    if usage.primary.used_percent <= f64::EPSILON
+        && usage.secondary.is_none()
+        && usage.tertiary.is_none()
+        && usage.extra_rate_windows.is_empty()
+    {
+        return Err(ProviderError::Parse(
+            "Grok billing returned no usable allowance windows".to_string(),
+        ));
+    }
+
+    Ok(finish_grok_usage(
+        usage,
+        email,
+        team_id,
+        login_method,
+        source_label,
+    ))
+}
+
+impl GrokBillingSnapshot {
+    fn on_demand_percent(&self) -> Option<f64> {
+        let cap = self.on_demand_cap.filter(|cap| cap.is_finite() && *cap > 0.0)?;
+        let used = self.on_demand_used.filter(|used| used.is_finite())?;
+        Some((used / cap * 100.0).clamp(0.0, 100.0))
+    }
+}
+
+fn prepaid_credits_window(balance: f64) -> RateWindow {
+    RateWindow::with_details(
+        0.0,
+        None,
+        None,
+        Some(format!("{balance:.2} credits left")),
+    )
+}
+
+fn finish_grok_usage(
+    mut usage: UsageSnapshot,
+    email: Option<String>,
+    team_id: Option<String>,
+    login_method: Option<String>,
+    source_label: &str,
 ) -> ProviderFetchResult {
-    let mut usage = UsageSnapshot::new(RateWindow::with_details(
-        billing.used_percent,
-        None,
-        billing.resets_at,
-        None,
-    ));
     usage.account_email = email;
     usage.account_organization = team_id;
     usage.login_method = login_method;
@@ -356,54 +466,56 @@ fn parse_grpc_web_response(data: &[u8]) -> Result<GrokBillingSnapshot, ProviderE
     for frame in frames {
         scan.scan_message(&frame, &mut Vec::new(), 0);
     }
-    // Percent can be a varint on field 11 (e.g. 88) or a fixed32 on field 1.
-    let used_percent = scan
-        .varints
-        .iter()
-        .filter(|field| field.path.last() == Some(&11) && field.value <= 100)
-        .map(|field| field.value as f64)
-        .next()
-        .or_else(|| {
-            scan.fixed32
-                .iter()
-                .filter(|field| {
-                    field.path.last() == Some(&1)
-                        && field.value.is_finite()
-                        && field.value >= 0.0
-                        && field.value <= 100.0
-                })
-                .min_by(|a, b| {
-                    a.path
-                        .len()
-                        .cmp(&b.path.len())
-                        .then_with(|| a.order.cmp(&b.order))
-                })
-                .map(|field| field.value as f64)
-        })
-        .or_else(|| {
-            scan.varints
-                .iter()
-                .filter(|field| field.value <= 100)
-                .map(|field| field.value as f64)
-                .next()
-        })
-        .ok_or_else(|| ProviderError::Parse("Could not parse Grok billing percent".to_string()))?;
 
-    let resets_at = scan
-        .varints
-        .iter()
-        .filter_map(|field| {
-            (1_700_000_000..=2_100_000_000)
-                .contains(&field.value)
-                .then(|| Utc.timestamp_opt(field.value as i64, 0).single())
-                .flatten()
-        })
-        .filter(|dt| *dt > Utc::now())
-        .min();
+    let credit_usage_percent = scan
+        .fixed32_at_path(&[1, 1])
+        .or_else(|| scan.fixed32_at_path(&[1]))
+        .ok_or_else(|| {
+            ProviderError::Parse("Could not parse Grok credit usage percent".to_string())
+        })?;
+
+    let is_weekly_period = scan.varint_at_path(&[1, 11]) == Some(1);
+
+    let period_end = scan
+        .timestamp_at_path(&[1, 5, 1])
+        .or_else(|| scan.latest_future_timestamp());
+
+    let prepaid_balance = scan.double_at_path(&[1, 2, 1]);
+    let monthly_limit = scan.double_at_path(&[1, 3, 1]);
+    let total_used = scan.double_at_path(&[1, 10, 1]);
+    let on_demand_cap = scan.double_at_path(&[1, 6, 1]);
+    let on_demand_used = scan.double_at_path(&[1, 9, 1]);
+
+    let monthly_percent = match (monthly_limit, total_used) {
+        (Some(limit), Some(used)) if limit.is_finite() && used.is_finite() && limit > 0.0 => {
+            Some((used / limit * 100.0).clamp(0.0, 100.0))
+        }
+        _ => None,
+    };
+
     Ok(GrokBillingSnapshot {
-        used_percent,
-        resets_at,
+        weekly_percent: Some(credit_usage_percent),
+        monthly_percent,
+        prepaid_balance,
+        on_demand_cap,
+        on_demand_used,
+        period_end,
+        is_weekly_period,
     })
+}
+
+fn timestamp_from_varint(raw: u64) -> Option<DateTime<Utc>> {
+    (1_700_000_000..=2_100_000_000)
+        .contains(&raw)
+        .then(|| Utc.timestamp_opt(raw as i64, 0).single())
+        .flatten()
+}
+
+fn timestamp_from_path(field: &VarintField) -> Option<DateTime<Utc>> {
+    if field.path.last() != Some(&1) {
+        return None;
+    }
+    timestamp_from_varint(field.value)
 }
 
 fn grpc_web_data_frames(data: &[u8]) -> Vec<Vec<u8>> {
@@ -431,6 +543,7 @@ fn grpc_web_data_frames(data: &[u8]) -> Vec<Vec<u8>> {
 #[derive(Default)]
 struct ProtoScan {
     fixed32: Vec<Fixed32Field>,
+    doubles: Vec<DoubleField>,
     varints: Vec<VarintField>,
     order: usize,
 }
@@ -446,7 +559,48 @@ struct VarintField {
     value: u64,
 }
 
+struct DoubleField {
+    path: Vec<u64>,
+    value: f64,
+}
+
 impl ProtoScan {
+    fn fixed32_at_path(&self, path: &[u64]) -> Option<f64> {
+        self.fixed32
+            .iter()
+            .filter(|field| field.path == path)
+            .map(|field| f64::from(field.value))
+            .find(|value| value.is_finite() && (0.0..=100.0).contains(value))
+    }
+
+    fn double_at_path(&self, path: &[u64]) -> Option<f64> {
+        self.doubles
+            .iter()
+            .find(|field| field.path == path)
+            .map(|field| field.value)
+            .filter(|value| value.is_finite())
+    }
+
+    fn varint_at_path(&self, path: &[u64]) -> Option<u64> {
+        self.varints
+            .iter()
+            .find(|field| field.path == path)
+            .map(|field| field.value)
+    }
+
+    fn timestamp_at_path(&self, path: &[u64]) -> Option<DateTime<Utc>> {
+        self.varint_at_path(path).and_then(timestamp_from_varint)
+    }
+
+    fn latest_future_timestamp(&self) -> Option<DateTime<Utc>> {
+        let now = Utc::now();
+        self.varints
+            .iter()
+            .filter_map(timestamp_from_path)
+            .filter(|dt| *dt > now)
+            .max()
+    }
+
     fn scan_message(&mut self, data: &[u8], path: &mut Vec<u64>, depth: usize) {
         if depth > 8 {
             return;
@@ -479,7 +633,7 @@ impl ProtoScan {
             0 => self.scan_varint(data, i, path),
             2 => self.scan_length_delimited(data, i, path, depth),
             5 => self.scan_fixed32(data, i, path),
-            1 => Some(i.saturating_add(8)),
+            1 => self.scan_double(data, i, path),
             _ => None,
         }
     }
@@ -523,6 +677,27 @@ impl ProtoScan {
         });
         self.order += 1;
         Some(i + 4)
+    }
+
+    fn scan_double(&mut self, data: &[u8], i: usize, path: &[u64]) -> Option<usize> {
+        if i + 8 > data.len() {
+            return None;
+        }
+        let bytes = [
+            data[i],
+            data[i + 1],
+            data[i + 2],
+            data[i + 3],
+            data[i + 4],
+            data[i + 5],
+            data[i + 6],
+            data[i + 7],
+        ];
+        self.doubles.push(DoubleField {
+            path: path.to_vec(),
+            value: f64::from_le_bytes(bytes),
+        });
+        Some(i + 8)
     }
 }
 
@@ -570,15 +745,78 @@ mod tests {
     #[test]
     fn parses_live_billing_response() {
         let data = [
-            0x00, 0x00, 0x00, 0x00, 0x48, 0x0a, 0x46, 0x12, 0x00, 0x1a, 0x00, 0x22, 0x0c, 0x08,
-            0xe8, 0xc9, 0x88, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf, 0x03, 0x2a, 0x0c, 0x08,
-            0xe8, 0xbe, 0xad, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf, 0x03, 0x42, 0x1e, 0x08,
+            0x00, 0x00, 0x00, 0x00, 0x56, 0x0a, 0x54, 0x0d, 0x00, 0x00, 0x98, 0x41, 0x12, 0x00,
+            0x1a, 0x00, 0x22, 0x0c, 0x08, 0xe8, 0xc9, 0x88, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f,
+            0xcf, 0x03, 0x2a, 0x0c, 0x08, 0xe8, 0xbe, 0xad, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f,
+            0xcf, 0x03, 0x3a, 0x07, 0x08, 0x02, 0x15, 0x00, 0x00, 0x98, 0x41, 0x42, 0x1e, 0x08,
             0x02, 0x12, 0x0c, 0x08, 0xe8, 0xc9, 0x88, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf,
             0x03, 0x1a, 0x0c, 0x08, 0xe8, 0xbe, 0xad, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf,
-            0x03, 0x58, 0x01, 0x62, 0x00, 0x68, 0x02, 0x80, 0x00, 0x00,
+            0x03, 0x58, 0x01, 0x62, 0x00, 0x68, 0x02,
         ];
         let billing = parse_grpc_web_response(&data).expect("live billing payload should parse");
-        assert_eq!(billing.used_percent, 1.0);
-        assert!(billing.resets_at.is_some());
+        assert_eq!(billing.weekly_percent, Some(19.0));
+        assert!(billing.period_end.is_some());
+        assert!(billing.is_weekly_period);
+        assert_eq!(billing.prepaid_balance, None);
+        assert_eq!(billing.monthly_percent, None);
+    }
+
+    #[test]
+    fn weekly_primary_has_no_duplicate_secondary() {
+        let billing = GrokBillingSnapshot {
+            weekly_percent: Some(19.0),
+            monthly_percent: None,
+            prepaid_balance: None,
+            on_demand_cap: None,
+            on_demand_used: None,
+            period_end: Some(Utc::now() + chrono::Duration::days(7)),
+            is_weekly_period: true,
+        };
+        let result = result_from_billing(billing, "grok-web", None, None, None).unwrap();
+        assert_eq!(result.usage.primary.used_percent, 19.0);
+        assert_eq!(result.usage.primary.window_minutes, Some(10_080));
+        assert!(result.usage.secondary.is_none());
+        assert!(result.usage.tertiary.is_none());
+        assert!(result.usage.extra_rate_windows.is_empty());
+    }
+
+    #[test]
+    fn shows_prepaid_credits_as_secondary_when_available() {
+        let billing = GrokBillingSnapshot {
+            weekly_percent: Some(40.0),
+            monthly_percent: None,
+            prepaid_balance: Some(12.5),
+            on_demand_cap: None,
+            on_demand_used: None,
+            period_end: Some(Utc::now() + chrono::Duration::days(7)),
+            is_weekly_period: true,
+        };
+        let result = result_from_billing(billing, "grok-web", None, None, None).unwrap();
+        let credits = result
+            .usage
+            .secondary
+            .expect("prepaid credits should be secondary");
+        assert_eq!(credits.used_percent, 0.0);
+        assert_eq!(
+            credits.reset_description.as_deref(),
+            Some("12.50 credits left")
+        );
+    }
+
+    #[test]
+    fn shows_on_demand_extra_window_when_configured() {
+        let billing = GrokBillingSnapshot {
+            weekly_percent: Some(25.0),
+            monthly_percent: None,
+            prepaid_balance: None,
+            on_demand_cap: Some(100.0),
+            on_demand_used: Some(40.0),
+            period_end: Some(Utc::now() + chrono::Duration::days(7)),
+            is_weekly_period: true,
+        };
+        let result = result_from_billing(billing, "grok-web", None, None, None).unwrap();
+        assert_eq!(result.usage.extra_rate_windows.len(), 1);
+        assert_eq!(result.usage.extra_rate_windows[0].title, "On-demand");
+        assert_eq!(result.usage.extra_rate_windows[0].window.used_percent, 40.0);
     }
 }

@@ -2,6 +2,8 @@
 
 Grok uses a gRPC-web billing endpoint (`grok.com`) with two authentication paths: an OAuth token from `grok login` (stored in `~/.grok/auth.json`), or browser session cookies from grok.com.
 
+This is the same billing data surfaced by the Grok CLI `/usage` command — Token-Tracker calls the API directly rather than scraping the interactive TUI (unlike Claude Code, which uses a PTY probe for `/usage`).
+
 ---
 
 ## Authentication Methods
@@ -77,6 +79,62 @@ Or use **Settings → Import** to pull cookies from a browser profile (provider 
 
 ---
 
+## Grok CLI `/usage` (Reference)
+
+The Grok CLI exposes `/usage` as an interactive slash command. It does **not** write usage stats to a separate cache file — it fetches live billing config from the same `GetGrokCreditsConfig` endpoint and renders:
+
+- **Weekly limit** — `creditUsagePercent` when `currentPeriod.type` is `USAGE_PERIOD_TYPE_WEEKLY`
+- **Credits left** — `prepaidBalance` (prepaid / top-up balance, separate from the weekly allowance)
+- **Monthly limit** — `totalUsed` against `monthlyLimit` (when the plan exposes a monthly cap)
+- **Pay-as-you-go / on-demand** — `onDemandUsed` against `onDemandCap` (when configured)
+- **Next reset** from `billingPeriodEnd`
+
+Token-Tracker maps these to distinct UI bars. **Do not** duplicate `creditUsagePercent` as both "Weekly" and "Credits" — that was the previous bug.
+
+**Relevant Grok home files:**
+
+| Path | Purpose |
+|------|---------|
+| `~/.grok/auth.json` | OAuth tokens from `grok login` (primary auth source) |
+| `~/.grok/logs/unified.jsonl` | CLI debug logs; includes `billing: fetched credits config` with parsed JSON |
+| `~/.grok/config.toml` | CLI configuration |
+| `$GROK_HOME/auth.json` | Auth file when `GROK_HOME` is set |
+
+**Example log entry** (from `unified.jsonl`):
+
+```json
+{
+  "msg": "billing: fetched credits config",
+  "ctx": {
+    "config": {
+      "creditUsagePercent": 19.0,
+      "currentPeriod": {
+        "type": "USAGE_PERIOD_TYPE_WEEKLY",
+        "start": "2026-06-29T07:55:20.971490+00:00",
+        "end": "2026-07-06T07:55:20.971490+00:00"
+      },
+      "onDemandCap": { "val": 0 },
+      "onDemandUsed": { "val": 0 },
+      "prepaidBalance": { "val": 0 },
+      "billingPeriodStart": "2026-06-29T07:55:20.971490+00:00",
+      "billingPeriodEnd": "2026-07-06T07:55:20.971490+00:00"
+    },
+    "subscriptionTier": "X Premium"
+  }
+}
+```
+
+**Comparison with Claude Code:**
+
+| | Claude | Grok |
+|---|--------|------|
+| Primary fetch | PTY probe: `claude` + `/usage` | gRPC-web `GetGrokCreditsConfig` |
+| Auth | Claude CLI session | `~/.grok/auth.json` or browser cookies |
+| Usage cache file | None (live CLI output) | None (live API response) |
+| Source modes | Auto, CLI, Web, OAuth | Auto, Web |
+
+---
+
 ## gRPC-Web Protocol
 
 ### Request
@@ -107,25 +165,73 @@ The response is a gRPC-web frame sequence:
 [flags (1 byte)][length (4 bytes big-endian)][data...][flags][length][data]...
 ```
 
-The parser walks protobuf fields in each data frame and collects `varint` (wire 0) and `fixed32` (wire 5) values.
+Only data frames (`flags & 0x80 == 0`) are parsed. The parser walks protobuf fields in each data frame and collects `varint` (wire 0), `double` (wire 1), and `fixed32` (wire 5) values with their field paths.
 
-**Used percent** (priority order):
-1. `varint` on protobuf **field 11** with value `0–100`
-2. `fixed32` on protobuf **field 1** in range `0.0–100.0` (shortest path wins)
-3. Any other `varint` with value `≤ 100`
+**Protobuf field mapping** (from live `GetGrokCreditsConfig` responses; no public `.proto` is shipped with the CLI):
 
-**Resets at:** smallest future Unix timestamp varint in range `1_700_000_000–2_100_000_000`
+| Path | Wire | JSON field | Meaning |
+|------|------|------------|---------|
+| `[1, 1]` | fixed32 | `creditUsagePercent` | Allowance usage percent (0–100) |
+| `[1, 2, 1]` | double | `prepaidBalance.val` | Prepaid / top-up credits remaining |
+| `[1, 3, 1]` | double | `monthlyLimit.val` | Monthly cap (cents) |
+| `[1, 4, 1]` | varint | `billingPeriodStart` | Period start (Unix seconds) |
+| `[1, 5, 1]` | varint | `billingPeriodEnd` | Period end (Unix seconds) |
+| `[1, 6, 1]` | double | `onDemandCap.val` | Pay-as-you-go cap |
+| `[1, 7, 1]` | varint | `currentPeriod.type` | Period type enum inside `currentPeriod` |
+| `[1, 7, 2]` | fixed32 | — | Mirrors `creditUsagePercent` inside `currentPeriod` |
+| `[1, 9, 1]` | double | `onDemandUsed.val` | Pay-as-you-go consumption |
+| `[1, 10, 1]` | double | `totalUsed.val` | Total included usage (cents) |
+| `[1, 11]` | varint `1` | `currentPeriod.type` | `USAGE_PERIOD_TYPE_WEEKLY` at top level |
+| `[1, 13]` | varint | `subscriptionTier` | Plan tier enum |
+
+**Important:** protobuf field **11** is the period-type enum (`1` = weekly), **not** a usage percentage. Do not treat varint values on field 11 as `used_percent`. Field `[1, 7, 2]` duplicates `[1, 1]` and must not be shown as a separate bar.
+
+Proto3 omits zero-valued `{ val: 0 }` wrappers — e.g. `prepaidBalance`, `monthlyLimit`, and `onDemandCap` appear as empty sub-messages when unset.
+
+**Extracted `GrokBillingSnapshot` values:**
+
+| Field | Extraction |
+|-------|------------|
+| `weekly_percent` | `fixed32` at `[1, 1]` (fallback: `[1]`) — stored as `creditUsagePercent` |
+| `is_weekly_period` | `varint` at `[1, 11]` equals `1` |
+| `period_end` | `varint` at `[1, 5, 1]`, else latest future timestamp in `1_700_000_000–2_100_000_000` |
+| `prepaid_balance` | `double` at `[1, 2, 1]` |
+| `monthly_percent` | `totalUsed / monthlyLimit * 100` from doubles at `[1, 10, 1]` and `[1, 3, 1]` |
+| `on_demand_cap` / `on_demand_used` | doubles at `[1, 6, 1]` and `[1, 9, 1]` |
+| `on_demand_percent` | `on_demand_used / on_demand_cap * 100` when cap > 0 |
 
 ---
 
 ## Rate Windows
 
-| Window | Label | Source | Notes |
-|--------|-------|--------|-------|
-| Primary | `Credits` | `used_percent` from gRPC | On-demand credit consumption |
-| Secondary | `On-demand` | `resets_at` timestamp | Reset countdown from server timestamp |
+| Window | UI label | `UsageSnapshot` slot | Source | Shown when |
+|--------|----------|---------------------|--------|------------|
+| Primary | `Weekly` | `primary` | `creditUsagePercent` at `[1, 1]` | `is_weekly_period` (field 11 = weekly) |
+| Secondary | `Credits` | `secondary` | `prepaidBalance` at `[1, 2, 1]` | Prepaid balance > 0 (and a primary allowance exists) |
+| Tertiary | `Monthly` | `tertiary` | `totalUsed / monthlyLimit` | Weekly period **and** monthly cap data present |
+| Extra | `On-demand` | `extra_rate_windows` | `onDemandUsed / onDemandCap` | On-demand cap > 0 |
 
-Mapped to `UsageSnapshot.primary` (percent) and `UsageSnapshot.secondary` (reset time).
+**Primary fallbacks** (when `is_weekly_period` is false):
+
+| Condition | Primary slot | `window_minutes` |
+|-----------|--------------|------------------|
+| `monthly_percent` computed | `primary` at monthly usage % | `43200` |
+| `creditUsagePercent` only | `primary` at credit usage % | `43200` |
+| `prepaidBalance` only (no allowance) | `primary` with `reset_description` | — (`"X.XX credits left"`) |
+
+**Typical X Premium account** (weekly period, zero prepaid, zero on-demand): **one bar** — **Weekly** at `creditUsagePercent`.
+
+Mapped from `GrokBillingSnapshot` in `result_from_billing()`:
+
+```text
+primary   ← creditUsagePercent when is_weekly_period (window_minutes: 10080, period_end)
+          ← monthly_percent when no weekly period
+          ← creditUsagePercent fallback (43_200 min window)
+          ← prepaid_balance when no allowance fields
+secondary ← prepaid_balance when > 0 and primary is an allowance bar
+tertiary  ← monthly_percent when is_weekly_period and monthly cap data exists
+extra     ← on_demand_percent when on_demand_cap > 0
+```
 
 ---
 
@@ -150,8 +256,9 @@ Account email and team ID are also surfaced when present in the auth entry.
 |-------|-------|
 | Provider ID | `grok` |
 | Display Name | `Grok` |
-| Session Label | `Credits` |
-| Weekly Label | `On-demand` |
+| Session Label (primary bar) | `Weekly` |
+| Weekly Label (secondary bar) | `Credits` |
+| Opus Label (tertiary bar) | `Monthly` |
 | Logo | `/logos/grok.svg` (light), `/logos/grok-dark.svg` (dark) |
 | Progress gradient | `from-[#f3f4f6] to-[#6b7280]` |
 | Supports Credits | `false` |
@@ -180,8 +287,9 @@ Account email and team ID are also surfaced when present in the auth entry.
 | Condition | Error |
 |-----------|-------|
 | Empty response body | `Grok web billing returned no payload` |
-| No percentage field found | `Could not parse Grok billing percent` |
-| No reset timestamp found | silently sets `resets_at: null` (acceptable) |
+| No `creditUsagePercent` fixed32 | `Could not parse Grok credit usage percent` |
+| No usable windows after mapping | `Grok billing returned no usable allowance windows` |
+| No period end timestamp | `period_end: null` (acceptable; reset countdown omitted) |
 
 ---
 
@@ -199,12 +307,14 @@ Account email and team ID are also surfaced when present in the auth entry.
 | Tab mini-progress + logo | `src/components/ProviderTabBar.tsx` |
 | Dashboard / status links | `src/components/ActionMenu.tsx` |
 
-**Source modes:** `Auto`, `Web` (no CLI or OAuth source)
+**Source modes:** `Auto`, `Web` (no CLI or OAuth source — billing API is used directly)
 
 **Fetch order (Auto/Web):**
 1. Manual cookie header (if set in settings)
 2. Windows browser cookie auto-extraction
 3. `~/.grok/auth.json` OAuth token
+
+**CLI version detection:** `grok --version` is surfaced via `detect_version()` but usage is not fetched through the CLI.
 
 ---
 
@@ -216,3 +326,5 @@ Account email and team ID are also surfaced when present in the auth entry.
 4. Verify auth file: `cat ~/.grok/auth.json | python3 -c "import json,sys; d=json.load(sys.stdin); [print(k,'->',v.get('email'),v.get('auth_mode')) for k,v in d.items()]"`
 
 If Grok shows as unavailable after login, the token may have been revoked server-side — re-run `grok login`.
+
+To compare with the CLI view, run `/usage` inside `grok` or inspect `~/.grok/logs/unified.jsonl` for `billing: fetched credits config` entries.
