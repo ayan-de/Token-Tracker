@@ -54,9 +54,9 @@ const SubTabButton = memo(function SubTabButton({
             }}
           />
         )}
-        {providerLogo(tab.id, theme) ? (
+        {providerLogo(tab.id, isSelected ? 'light' : theme) ? (
           <img
-            src={providerLogo(tab.id, theme)}
+            src={providerLogo(tab.id, isSelected ? 'light' : theme)}
             alt=""
             className={`w-4 h-4 object-contain relative z-10 ${
               isSelected ? "opacity-100" : "opacity-80"

@@ -39,9 +39,9 @@ const ProviderTab = memo(function ProviderTab({
         {isSelected && (
           <div className="absolute inset-0 rounded-full bg-white" style={{ boxShadow: '0 0 10px 3px rgba(255, 255, 255, 0.4), 0 0 25px 8px rgba(255, 255, 255, 0.3), 0 0 50px 15px rgba(255, 255, 255, 0.2), 0 0 100px 30px rgba(255, 255, 255, 0.1)' }} />
         )}
-        {providerLogo(p.provider, theme) ? (
+        {providerLogo(p.provider, isSelected ? 'light' : theme) ? (
           <img
-            src={providerLogo(p.provider, theme)}
+            src={providerLogo(p.provider, isSelected ? 'light' : theme)}
             alt=""
             className={`w-5 h-5 object-contain relative z-10 ${isSelected ? 'opacity-100' : 'opacity-80'}`}
           />
