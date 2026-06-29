@@ -216,7 +216,7 @@ export default function SettingsModal({
           )}
 
           {activeSettingsTab === 'providers' && (
-            <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1 scrollbar-thin">
+            <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1 scrollbar-thin">
               <p className="text-[11px] text-text-muted pb-1.5 border-b border-border-subtle leading-tight">
                 Select which AI providers to show in the switcher tabs:
               </p>
