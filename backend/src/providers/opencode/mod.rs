@@ -23,11 +23,12 @@ use crate::core::{
 };
 use crate::providers::provider_factory::create_provider;
 
-/// OpenCode auth.json entry
+/// OpenCode auth.json entry — key is optional (OAuth entries don't have one)
 #[derive(Debug, Deserialize)]
 struct AuthEntry {
     #[serde(rename = "type")]
     entry_type: String,
+    #[serde(default)]
     key: String,
 }
 
