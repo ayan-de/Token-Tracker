@@ -1,6 +1,7 @@
-//! Browser detection for Windows and WSL
+//! Browser detection for Windows, native Linux, and WSL
 //!
 //! On native Windows, uses standard AppData paths.
+//! On native Linux, uses XDG config paths (e.g. `~/.config/chromium`).
 //! On WSL, resolves browser paths via /mnt/c/ to access Windows browser data.
 
 #![allow(dead_code)]
@@ -70,7 +71,12 @@ pub struct BrowserProfile {
 impl BrowserProfile {
     /// Get the cookies database path for Chromium browsers
     pub fn cookies_db_path(&self) -> PathBuf {
-        self.path.join("Network").join("Cookies")
+        let network_cookies = self.path.join("Network").join("Cookies");
+        if network_cookies.exists() {
+            network_cookies
+        } else {
+            self.path.join("Cookies")
+        }
     }
 
     /// Get the Local State file path (contains encryption key)
@@ -134,6 +140,13 @@ impl BrowserDetector {
 
     /// Get the user data directory for a browser
     fn get_user_data_dir(browser_type: BrowserType) -> Option<PathBuf> {
+        #[cfg(target_os = "linux")]
+        if !wsl::is_wsl()
+            && let Some(path) = Self::linux_user_data_dir(browser_type)
+        {
+            return Some(path);
+        }
+
         // In WSL, prefer Windows AppData paths when available
         if wsl::is_wsl()
             && let Some(appdata_local) = wsl::windows_appdata_local()
@@ -191,6 +204,28 @@ impl BrowserDetector {
         };
 
         Some(path)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn linux_user_data_dir(browser_type: BrowserType) -> Option<PathBuf> {
+        let config_dir = dirs::config_dir()?;
+        let path = match browser_type {
+            BrowserType::Chrome => config_dir.join("google-chrome"),
+            BrowserType::Chromium => config_dir.join("chromium"),
+            BrowserType::Brave => config_dir.join("BraveSoftware").join("Brave-Browser"),
+            BrowserType::Edge => config_dir.join("microsoft-edge"),
+            BrowserType::Arc => config_dir.join("Arc"),
+            BrowserType::Firefox => {
+                let config_profiles = config_dir.join("mozilla").join("firefox");
+                if config_profiles.exists() {
+                    config_profiles
+                } else {
+                    dirs::home_dir()?.join(".mozilla").join("firefox")
+                }
+            }
+        };
+
+        path.exists().then_some(path)
     }
 
     /// Detect profiles within a browser's user data directory
@@ -277,5 +312,18 @@ mod tests {
                 browser.profiles.len()
             );
         }
+    }
+
+    #[test]
+    fn test_cookies_db_path_prefers_network_layout() {
+        let profile = BrowserProfile {
+            name: "Default".to_string(),
+            path: PathBuf::from("/tmp/nonexistent-profile"),
+            is_default: true,
+        };
+        assert_eq!(
+            profile.cookies_db_path(),
+            PathBuf::from("/tmp/nonexistent-profile/Cookies")
+        );
     }
 }
