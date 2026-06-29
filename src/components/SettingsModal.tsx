@@ -266,7 +266,7 @@ export default function SettingsModal({
               {/* Saved Credentials List */}
               <div className="space-y-2">
                 <h4 className="text-[11px] font-bold text-text-main uppercase tracking-wider">Active Credentials</h4>
-                <div className="max-h-[140px] overflow-y-auto border border-border-subtle rounded-lg divide-y divide-border-subtle bg-primary/10">
+                <div className="max-h-[140px] overflow-y-auto border border-border-subtle rounded-sm divide-y divide-border-subtle bg-primary/10">
                   {credentials.length === 0 ? (
                     <div className="p-3 text-center text-text-muted text-[10px]">No credentials configured. Add one below.</div>
                   ) : (
@@ -293,13 +293,13 @@ export default function SettingsModal({
               </div>
 
               {/* Add New Form */}
-              <div className="p-3 bg-primary/20 border border-border-subtle rounded-lg space-y-2.5">
+              <div className="p-3 bg-primary/20 border border-border-subtle rounded-sm space-y-2.5">
                 <h4 className="text-[10px] font-bold text-text-main uppercase tracking-wider">Add Credential</h4>
                 <div className="flex gap-2">
                   <select
                     value={credProvider}
                     onChange={(e) => setCredProvider(e.target.value)}
-                    className="bg-primary border border-border-subtle rounded-lg px-2 py-1.5 text-text-main text-xs focus:outline-none flex-1"
+                    className="bg-primary border border-border-subtle rounded-sm px-2 py-1.5 text-text-main text-xs focus:outline-none flex-1"
                   >
                     {Object.entries(PROVIDER_DESCRIPTORS).map(([id, desc]) => (
                       <option key={id} value={id}>{desc.displayName}</option>
@@ -316,7 +316,7 @@ export default function SettingsModal({
                         <select
                           value={credType}
                           onChange={(e) => setCredType(e.target.value as 'key' | 'cookie')}
-                          className="bg-primary border border-border-subtle rounded-lg px-2 py-1.5 text-text-main text-xs focus:outline-none flex-1"
+                          className="bg-primary border border-border-subtle rounded-sm px-2 py-1.5 text-text-main text-xs focus:outline-none flex-1"
                         >
                           <option value="key">API Key</option>
                           <option value="cookie">Manual Cookie</option>
@@ -345,7 +345,7 @@ export default function SettingsModal({
                               placeholder={field.placeholder}
                               value={credExtraFields[field.key] ?? ''}
                               onChange={(e) => setCredExtraFields(prev => ({ ...prev, [field.key]: e.target.value }))}
-                              className="bg-primary border border-border-subtle rounded-lg px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
+                              className="bg-primary border border-border-subtle rounded-sm px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
                             />
                           </div>
                         ))}
@@ -355,7 +355,7 @@ export default function SettingsModal({
                             placeholder={apiKeyField?.placeholder ?? "API Key..."}
                             value={credSecret}
                             onChange={(e) => setCredSecret(e.target.value)}
-                            className="bg-primary border border-border-subtle rounded-lg px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
+                            className="bg-primary border border-border-subtle rounded-sm px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
                           />
                           <button
                             onClick={async () => {
@@ -387,7 +387,7 @@ export default function SettingsModal({
                         placeholder={credType === "key" ? "Paste API Key..." : "Paste Cookie Header (e.g. session=...)"}
                         value={credSecret}
                         onChange={(e) => setCredSecret(e.target.value)}
-                        className="bg-primary border border-border-subtle rounded-lg px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
+                        className="bg-primary border border-border-subtle rounded-sm px-3 py-1.5 text-text-main text-xs focus:outline-none flex-1 font-fira"
                       />
                       <button
                         onClick={async () => {
@@ -419,14 +419,14 @@ export default function SettingsModal({
                   No compatible Chromium or Firefox browsers detected on your system.
                 </div>
               ) : (
-                <div className="space-y-3.5 p-3 bg-primary/20 border border-border-subtle rounded-lg">
+                <div className="space-y-3.5 p-3 bg-primary/20 border border-border-subtle rounded-sm">
                   {/* Browser Selector */}
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-text-main uppercase tracking-wide">1. Select Browser</label>
                     <select
                       value={importBrowserId}
                       onChange={(e) => setImportBrowserId(e.target.value)}
-                      className="bg-primary border border-border-subtle rounded-lg px-2.5 py-1.5 text-text-main text-xs focus:outline-none"
+                      className="bg-primary border border-border-subtle rounded-sm px-2.5 py-1.5 text-text-main text-xs focus:outline-none"
                     >
                       {browsers.map((b) => (
                         <option key={b.id} value={b.id}>{b.name}</option>
