@@ -30,7 +30,7 @@ impl GrokProvider {
             metadata: ProviderMetadata {
                 id: ProviderId::Grok,
                 display_name: "Grok",
-                session_label: "Monthly",
+                session_label: "Credits",
                 weekly_label: "On-demand",
                 supports_opus: false,
                 supports_credits: false,
@@ -335,7 +335,7 @@ fn validate_grpc_headers(headers: &reqwest::header::HeaderMap) -> Result<(), Pro
         .and_then(|value| value.parse::<u16>().ok())
         && status != 0
     {
-        if status == 16 {
+        if status == 7 || status == 16 {
             return Err(ProviderError::AuthRequired);
         }
         return Err(ProviderError::Other(format!(
@@ -356,22 +356,37 @@ fn parse_grpc_web_response(data: &[u8]) -> Result<GrokBillingSnapshot, ProviderE
     for frame in frames {
         scan.scan_message(&frame, &mut Vec::new(), 0);
     }
+    // Percent can be a varint on field 11 (e.g. 88) or a fixed32 on field 1.
     let used_percent = scan
-        .fixed32
+        .varints
         .iter()
-        .filter(|field| {
-            field.path.last() == Some(&1)
-                && field.value.is_finite()
-                && field.value >= 0.0
-                && field.value <= 100.0
-        })
-        .min_by(|a, b| {
-            a.path
-                .len()
-                .cmp(&b.path.len())
-                .then_with(|| a.order.cmp(&b.order))
-        })
+        .filter(|field| field.path.last() == Some(&11) && field.value <= 100)
         .map(|field| field.value as f64)
+        .next()
+        .or_else(|| {
+            scan.fixed32
+                .iter()
+                .filter(|field| {
+                    field.path.last() == Some(&1)
+                        && field.value.is_finite()
+                        && field.value >= 0.0
+                        && field.value <= 100.0
+                })
+                .min_by(|a, b| {
+                    a.path
+                        .len()
+                        .cmp(&b.path.len())
+                        .then_with(|| a.order.cmp(&b.order))
+                })
+                .map(|field| field.value as f64)
+        })
+        .or_else(|| {
+            scan.varints
+                .iter()
+                .filter(|field| field.value <= 100)
+                .map(|field| field.value as f64)
+                .next()
+        })
         .ok_or_else(|| ProviderError::Parse("Could not parse Grok billing percent".to_string()))?;
 
     let resets_at = scan
@@ -427,6 +442,7 @@ struct Fixed32Field {
 }
 
 struct VarintField {
+    path: Vec<u64>,
     value: u64,
 }
 
@@ -460,7 +476,7 @@ impl ProtoScan {
         wire: u64,
     ) -> Option<usize> {
         match wire {
-            0 => self.scan_varint(data, i),
+            0 => self.scan_varint(data, i, path),
             2 => self.scan_length_delimited(data, i, path, depth),
             5 => self.scan_fixed32(data, i, path),
             1 => Some(i.saturating_add(8)),
@@ -468,9 +484,12 @@ impl ProtoScan {
         }
     }
 
-    fn scan_varint(&mut self, data: &[u8], i: usize) -> Option<usize> {
+    fn scan_varint(&mut self, data: &[u8], i: usize, path: &[u64]) -> Option<usize> {
         let (value, next) = read_varint(data, i)?;
-        self.varints.push(VarintField { value });
+        self.varints.push(VarintField {
+            path: path.to_vec(),
+            value,
+        });
         Some(next)
     }
 
@@ -546,5 +565,20 @@ mod tests {
     fn splits_grpc_web_data_frames() {
         let data = [0, 0, 0, 0, 2, 1, 2, 0x80, 0, 0, 0, 1, b'x'];
         assert_eq!(grpc_web_data_frames(&data), vec![vec![1, 2]]);
+    }
+
+    #[test]
+    fn parses_live_billing_response() {
+        let data = [
+            0x00, 0x00, 0x00, 0x00, 0x48, 0x0a, 0x46, 0x12, 0x00, 0x1a, 0x00, 0x22, 0x0c, 0x08,
+            0xe8, 0xc9, 0x88, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf, 0x03, 0x2a, 0x0c, 0x08,
+            0xe8, 0xbe, 0xad, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf, 0x03, 0x42, 0x1e, 0x08,
+            0x02, 0x12, 0x0c, 0x08, 0xe8, 0xc9, 0x88, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf,
+            0x03, 0x1a, 0x0c, 0x08, 0xe8, 0xbe, 0xad, 0xd2, 0x06, 0x10, 0xd0, 0x85, 0x9f, 0xcf,
+            0x03, 0x58, 0x01, 0x62, 0x00, 0x68, 0x02, 0x80, 0x00, 0x00,
+        ];
+        let billing = parse_grpc_web_response(&data).expect("live billing payload should parse");
+        assert_eq!(billing.used_percent, 1.0);
+        assert!(billing.resets_at.is_some());
     }
 }
