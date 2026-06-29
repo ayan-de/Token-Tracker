@@ -9,9 +9,11 @@ export default function AboutModal({ onClose }: AboutModalProps) {
     <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
       <div className="w-[320px] bg-secondary border border-border-subtle rounded-xl p-4 shadow-2xl text-center space-y-4">
         <div className="flex flex-col items-center">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-cyan via-accent-blue to-accent-purple flex items-center justify-center shadow-lg shadow-accent-blue/20 text-white font-extrabold text-lg tracking-wider mb-2 font-outfit">
-            TT
-          </div>
+          <img
+            src="/logos/app-icon.png"
+            alt="TokenTracker"
+            className="w-12 h-12 rounded-2xl shadow-lg shadow-accent-blue/20 mb-2"
+          />
           <h3 className="text-sm font-bold text-text-main leading-tight">TokenTracker Desktop</h3>
           <span className="text-[10px] text-text-muted">v0.1.0 (Beta) - Linux client</span>
         </div>

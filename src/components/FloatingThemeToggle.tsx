@@ -9,7 +9,7 @@ export default function FloatingThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="fixed bottom-4 right-4 w-10 h-10 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] shadow-lg shadow-[#3b82f6]/25 flex items-center justify-center text-white transition-all cursor-pointer z-[9999]"
+      className="fixed bottom-4 right-4 w-10 h-10 rounded-sm bg-[#3b82f6] hover:bg-[#2563eb] shadow-lg shadow-[#3b82f6]/25 flex items-center justify-center text-white transition-all cursor-pointer z-[9999]"
       title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
     >
       {theme === 'dark' ? (

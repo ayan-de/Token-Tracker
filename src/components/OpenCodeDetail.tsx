@@ -7,7 +7,8 @@ import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
 import ProviderSubTabBar, { type SubTab } from "./ProviderSubTabBar";
 import OpenCodeDBHistory from "./OpenCodeDBHistory";
 import LoginMethodBadge from "./LoginMethodBadge";
-import { useTheme } from "@/app/page";
+import ActionMenu from "./ActionMenu";
+import { useTheme, useModals } from "@/app/page";
 
 interface OpenCodeDetailProps {
   provider: ProviderUsage;
@@ -60,6 +61,7 @@ function tabUsedPercent(windows: NamedRateWindow[]): number | undefined {
 
 export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
   const { theme } = useTheme();
+  const { openAddAccount, openSettings, openAbout } = useModals();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
 
   // Build sub-tab data and separate DB windows
@@ -233,6 +235,12 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
             </span>
           </div>
         )}
+        <ActionMenu
+          provider={provider}
+          onOpenAddAccountModal={openAddAccount}
+          onOpenSettingsModal={openSettings}
+          onOpenAboutModal={openAbout}
+        />
       </div>
     </div>
   );
