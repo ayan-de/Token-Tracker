@@ -83,7 +83,7 @@ export default function SettingsModal({
 
   return (
     <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="w-[480px] h-[450px] bg-secondary border border-border-subtle rounded-xl p-4.5 shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-[480px] h-[450px] bg-secondary border border-border-subtle rounded-sm p-4.5 shadow-2xl flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border-subtle pb-2">
