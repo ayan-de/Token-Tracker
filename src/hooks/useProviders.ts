@@ -5,6 +5,7 @@ import {
   getProviders,
   getCost,
   triggerRefresh,
+  clearProviderCache,
   getHealth,
   getSettings,
   updateSettings,
@@ -28,6 +29,7 @@ interface UseProvidersReturn {
   credentials: any[];
   browsers: any[];
   refreshData: () => Promise<void>;
+  clearCache: (provider: string) => Promise<boolean>;
   updateAppSettings: (newSettings: any) => Promise<boolean>;
   addCredential: (provider: string, secret: string, type: "key" | "cookie") => Promise<boolean>;
   removeCredential: (provider: string) => Promise<boolean>;
@@ -98,6 +100,18 @@ export function useProviders(): UseProvidersReturn {
       setIsRefreshing(false);
     }
   }, [isRefreshing]);
+
+  const clearCache = useCallback(async (provider: string) => {
+    try {
+      await clearProviderCache(provider);
+      await refreshData();
+      return true;
+    } catch (err) {
+      console.error("Failed to clear cache:", err);
+      setError(`Failed to clear cache: ${err}`);
+      return false;
+    }
+  }, [refreshData]);
 
   const refetchSettings = useCallback(async () => {
     try {
@@ -229,6 +243,7 @@ export function useProviders(): UseProvidersReturn {
     credentials,
     browsers,
     refreshData,
+    clearCache,
     updateAppSettings,
     addCredential,
     removeCredential,

@@ -32,12 +32,16 @@ interface ModalContextValue {
   openAddAccount: (provider: string) => void;
   openSettings: () => void;
   openAbout: () => void;
+  clearCache: (provider: string) => Promise<boolean>;
+  isClearingCache: boolean;
 }
 
 const ModalContext = createContext<ModalContextValue>({
   openAddAccount: () => {},
   openSettings: () => {},
   openAbout: () => {},
+  clearCache: async () => false,
+  isClearingCache: false,
 });
 
 export function useModals() {
@@ -56,6 +60,7 @@ export default function HomePage() {
     browsers,
     installedProviders,
     refreshData,
+    clearCache,
     updateAppSettings,
     addCredential,
     removeCredential,
@@ -70,6 +75,7 @@ export default function HomePage() {
   const [addAccountProvider, setAddAccountProvider] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [isClearingCache, setIsClearingCache] = useState(false);
 
   // Load theme preference on mount and settings load
   useEffect(() => {
@@ -176,6 +182,16 @@ export default function HomePage() {
     setAboutOpen(false);
   }, []);
 
+  // Wrapper that tracks clearing state to disable the button in ActionMenu
+  const handleClearCache = useCallback(async (provider: string): Promise<boolean> => {
+    setIsClearingCache(true);
+    try {
+      return await clearCache(provider);
+    } finally {
+      setIsClearingCache(false);
+    }
+  }, [clearCache]);
+
   // Stable callback for theme toggle
   const handleToggleTheme = useCallback(() => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -196,7 +212,9 @@ export default function HomePage() {
     openAddAccount: handleOpenAddAccountModal,
     openSettings: handleOpenSettingsModal,
     openAbout: handleOpenAboutModal,
-  }), [handleOpenAddAccountModal, handleOpenSettingsModal, handleOpenAboutModal]);
+    clearCache: handleClearCache,
+    isClearingCache,
+  }), [handleOpenAddAccountModal, handleOpenSettingsModal, handleOpenAboutModal, handleClearCache, isClearingCache]);
 
   return (
     <ThemeContext.Provider value={themeContextValue}>

@@ -3,7 +3,7 @@
 import { memo } from "react";
 import type { ProviderUsage } from "@/lib/types";
 import { invoke } from "@tauri-apps/api/core";
-import { Key, BarChart3, Heart, Settings, Info, LogOut } from "@/lib/icons";
+import { Key, BarChart3, Heart, Settings, Info, LogOut, Trash2 } from "@/lib/icons";
 
 export const PROVIDER_URLS: Record<string, { dashboard: string; statusPage: string }> = {
   claude: { dashboard: "https://claude.ai/settings/usage", statusPage: "https://status.claude.com/" },
@@ -24,6 +24,8 @@ interface ActionMenuProps {
   onOpenAddAccountModal: (provider: string) => void;
   onOpenSettingsModal: () => void;
   onOpenAboutModal: () => void;
+  onClearCache: (provider: string) => Promise<boolean>;
+  isClearingCache?: boolean;
 }
 
 export default memo(function ActionMenu({
@@ -31,6 +33,8 @@ export default memo(function ActionMenu({
   onOpenAddAccountModal,
   onOpenSettingsModal,
   onOpenAboutModal,
+  onClearCache,
+  isClearingCache = false,
 }: ActionMenuProps) {
   const urls = PROVIDER_URLS[p.provider.toLowerCase()] || {
     dashboard: "https://github.com/steipete/CodexBar",
@@ -42,6 +46,14 @@ export default memo(function ActionMenu({
       await invoke("plugin:opener|open_url", { url });
     } catch (err) {
       console.error("Failed to open URL via Tauri:", err);
+    }
+  };
+
+  const handleClearCache = async () => {
+    try {
+      await onClearCache(p.provider);
+    } catch (err) {
+      console.error("Failed to clear cache:", err);
     }
   };
 
@@ -80,6 +92,16 @@ export default memo(function ActionMenu({
       >
         <Heart className="w-3.5 h-3.5" />
         <span>Status Page</span>
+      </button>
+
+      {/* Clear Cache */}
+      <button
+        onClick={handleClearCache}
+        disabled={isClearingCache}
+        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-hover-subtle text-text-muted hover:text-status-warning transition-all text-left cursor-pointer focus:bg-hover-subtle focus:text-status-warning focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+      >
+        <Trash2 className={`w-3.5 h-3.5 ${isClearingCache ? "animate-pulse" : ""}`} />
+        <span>{isClearingCache ? "Clearing..." : "Clear Cache"}</span>
       </button>
 
       <div className="h-px bg-border-subtle my-1.5" />

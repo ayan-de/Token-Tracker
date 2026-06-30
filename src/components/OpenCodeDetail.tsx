@@ -61,7 +61,7 @@ function tabUsedPercent(windows: NamedRateWindow[]): number | undefined {
 
 export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
   const { theme } = useTheme();
-  const { openAddAccount, openSettings, openAbout } = useModals();
+  const { openAddAccount, openSettings, openAbout, clearCache, isClearingCache } = useModals();
   const [selectedTab, setSelectedTab] = useState<string | null>(null);
 
   // Build sub-tab data and separate DB windows
@@ -240,6 +240,8 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
           onOpenAddAccountModal={openAddAccount}
           onOpenSettingsModal={openSettings}
           onOpenAboutModal={openAbout}
+          onClearCache={clearCache}
+          isClearingCache={isClearingCache}
         />
       </div>
     </div>

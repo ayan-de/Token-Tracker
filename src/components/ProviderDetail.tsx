@@ -18,7 +18,7 @@ export default memo(function ProviderDetail({
   provider,
   costItem,
 }: ProviderDetailProps) {
-  const { openAddAccount, openSettings, openAbout } = useModals();
+  const { openAddAccount, openSettings, openAbout, clearCache, isClearingCache } = useModals();
 
   const statusLoader = <div className="animate-pulse h-16 bg-[var(--color-border)] rounded-lg" />;
   const limitLoader = <div className="animate-pulse h-24 bg-[var(--color-border)] rounded-lg" />;
@@ -53,6 +53,8 @@ export default memo(function ProviderDetail({
         onOpenAddAccountModal={openAddAccount}
         onOpenSettingsModal={openSettings}
         onOpenAboutModal={openAbout}
+        onClearCache={clearCache}
+        isClearingCache={isClearingCache}
       />
     </div>
   );

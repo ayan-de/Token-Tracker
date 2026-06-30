@@ -63,6 +63,12 @@ export async function triggerRefresh(): Promise<SyncPayload> {
   });
 }
 
+export async function clearProviderCache(provider: string): Promise<{ status: string; provider: string; removedEntries: number }> {
+  return request(`/api/v1/providers/${encodeURIComponent(provider)}/cache`, {
+    method: "DELETE",
+  });
+}
+
 export async function getSettings(): Promise<any> {
   return request<any>("/api/v1/settings");
 }

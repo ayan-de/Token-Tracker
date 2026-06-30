@@ -641,6 +641,61 @@ pub async fn get_providers() -> impl IntoResponse {
     (StatusCode::OK, Json(json!([])))
 }
 
+pub async fn clear_provider_cache(
+    axum::extract::Path(provider): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let mut cache = match read_cache() {
+        Some(c) => c,
+        None => return (StatusCode::OK, Json(json!({ "status": "cleared", "provider": provider, "removedEntries": 0 }))).into_response(),
+    };
+
+    // Get mutable reference to the usage array
+    let usage_array = cache
+        .get_mut("usage")
+        .and_then(|u| u.as_array_mut());
+
+    let Some(usage_array) = usage_array else {
+        return (StatusCode::OK, Json(json!({ "status": "cleared", "provider": provider, "removedEntries": 0 }))).into_response();
+    };
+
+    let original_len = usage_array.len();
+    let provider_lower = provider.to_lowercase();
+    usage_array.retain(|item| {
+        item.get("provider")
+            .and_then(|v| v.as_str())
+            .map(|p| p.to_lowercase() != provider_lower)
+            .unwrap_or(true)
+    });
+
+    let removed_count = original_len - usage_array.len();
+
+    if removed_count == 0 {
+        // Not an error — treat as already cleared
+        return (StatusCode::OK, Json(json!({
+            "status": "cleared",
+            "provider": provider,
+            "removedEntries": 0
+        }))).into_response();
+    }
+
+    // Also remove from installedProviders list (case-insensitive)
+    if let Some(installed) = cache.get_mut("installedProviders").and_then(|i| i.as_array_mut()) {
+        installed.retain(|item| {
+            item.as_str().map(|s| s.to_lowercase() != provider_lower).unwrap_or(true)
+        });
+    }
+
+    if let Err(e) = write_cache(&cache) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to write cache: {}", e) }))).into_response();
+    }
+
+    (StatusCode::OK, Json(json!({
+        "status": "cleared",
+        "provider": provider,
+        "removedEntries": removed_count
+    }))).into_response()
+}
+
 pub async fn trigger_refresh() -> impl IntoResponse {
     let active_providers = get_active_providers();
     let cost_payload = scan_cost_history();
