@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PROVIDER_DESCRIPTORS, providerLogo, CredentialField } from "@/lib/dataMapping";
 import { Trash2 } from "@/lib/icons";
 import { useTheme } from "@/app/page";
+import LogoSelect from "./LogoSelect";
 
 interface SettingsModalProps {
   settings: any | null;
@@ -445,15 +446,17 @@ export default function SettingsModal({
                   {/* Browser Selector */}
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-text-main uppercase tracking-wide">1. Select Browser</label>
-                    <select
+                    <LogoSelect
                       value={importBrowserId}
-                      onChange={(e) => setImportBrowserId(e.target.value)}
-                      className="bg-primary border border-border-subtle rounded-sm px-2.5 py-1.5 text-text-main text-xs focus:outline-none"
-                    >
-                      {browsers.map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
-                    </select>
+                      onChange={setImportBrowserId}
+                      options={browsers.map((b) => ({
+                        value: b.id,
+                        label: b.name,
+                        logo: `/logos/${b.id}.svg`,
+                      }))}
+                      logoErrorHidden
+                      className="w-full"
+                    />
                   </div>
 
                   {/* Profile Selector */}
@@ -476,17 +479,18 @@ export default function SettingsModal({
                   {/* Provider Selector */}
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] font-bold text-text-main uppercase tracking-wide">3. Target AI Provider</label>
-                    <select
+                    <LogoSelect
                       value={importProviderId}
-                      onChange={(e) => setImportProviderId(e.target.value)}
-                      className="bg-primary border border-border-subtle rounded-lg px-2.5 py-1.5 text-text-main text-xs focus:outline-none"
-                    >
-                      {Object.entries(PROVIDER_DESCRIPTORS)
+                      onChange={setImportProviderId}
+                      options={Object.entries(PROVIDER_DESCRIPTORS)
                         .filter(([, desc]) => desc.importable)
-                        .map(([id, desc]) => (
-                          <option key={id} value={id}>{desc.displayName}</option>
-                        ))}
-                    </select>
+                        .map(([id, desc]) => ({
+                          value: id,
+                          label: desc.displayName,
+                          logo: providerLogo(id, theme) ?? undefined,
+                        }))}
+                      className="w-full"
+                    />
                   </div>
 
                   <button
