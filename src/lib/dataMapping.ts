@@ -93,6 +93,7 @@ export function mapProviderUsage(raw: any): ProviderUsage | null {
     return {
       provider: "claude",
       provider_label: "Claude",
+      source: raw.source,
       usage: null,
       stale: raw.stale === true,
       last_successful_at: raw.lastSuccessfulAt ?? null,
@@ -112,6 +113,7 @@ export function mapProviderUsage(raw: any): ProviderUsage | null {
     return {
       provider: "opencodego",
       provider_label: "OpenCode Go",
+      source: raw.source,
       usage: null,
       stale: raw.stale === true,
       last_successful_at: raw.lastSuccessfulAt ?? null,
@@ -126,6 +128,7 @@ export function mapProviderUsage(raw: any): ProviderUsage | null {
     return {
       provider,
       provider_label: providerLabel(provider, raw.provider_label),
+      source: raw.source,
       usage: null,
       stale: raw.stale === true,
       last_successful_at: raw.lastSuccessfulAt ?? null,
@@ -202,6 +205,7 @@ export function mapProviderUsage(raw: any): ProviderUsage | null {
     provider,
     provider_label: providerLabel(provider, raw.provider_label),
     version: raw.version,
+    source: raw.source,
     usage,
     stale: raw.stale === true,
     last_successful_at: raw.lastSuccessfulAt ?? null,

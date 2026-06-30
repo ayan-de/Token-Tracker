@@ -4,6 +4,7 @@ import { memo } from "react";
 import type { ProviderUsage } from "@/lib/types";
 import { PROVIDER_DESCRIPTORS, providerLogo } from "@/lib/dataMapping";
 import LoginMethodBadge from "@/components/LoginMethodBadge";
+import SourceBadge from "@/components/SourceBadge";
 import { useTheme } from "@/app/page";
 
 interface ProviderStatusProps {
@@ -49,6 +50,9 @@ export default memo(function ProviderStatus({
             <span className="text-[11px] text-text-muted/75">{lastUpdatedText}</span>
           </div>
         </div>
+        {p.source && (
+          <SourceBadge source={p.source} />
+        )}
       </div>
     );
   }
@@ -66,6 +70,9 @@ export default memo(function ProviderStatus({
       </div>
       {p.usage?.loginMethod && (
         <LoginMethodBadge loginMethod={p.usage.loginMethod} />
+      )}
+      {p.source && (
+        <SourceBadge source={p.source} />
       )}
     </div>
   );

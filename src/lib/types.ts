@@ -61,10 +61,13 @@ export interface ProviderUsageDetails {
   identity?: ProviderIdentity | null;
 }
 
+export type ProviderSource = 'cli' | 'web' | 'oauth' | 'auto';
+
 export interface ProviderUsage {
   provider: string;
   provider_label: string;
   version?: string;
+  source?: ProviderSource;
   usage?: ProviderUsageDetails | null;
   stale?: boolean;
   last_successful_at?: number | null;
@@ -98,6 +101,7 @@ export interface RawCliUsageItem {
   provider?: string;
   provider_label?: string;
   version?: string;
+  source?: ProviderSource;
   usage?: {
     loginMethod?: string;
     accountEmail?: string;
