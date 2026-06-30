@@ -18,6 +18,7 @@ pub fn create_router() -> Router {
         .route("/api/v1/providers", get(handlers::get_providers))
         .route("/api/v1/providers/refresh", post(handlers::trigger_refresh))
         .route("/api/v1/providers/:provider/cache", delete(handlers::clear_provider_cache))
+        .route("/api/v1/cache", delete(handlers::clear_all_cache))
         .route("/api/v1/cost", get(handlers::get_cost))
         .route("/api/v1/credentials", get(handlers::get_credentials).post(handlers::store_credential))
         .route("/api/v1/credentials/:id", delete(handlers::delete_credential))

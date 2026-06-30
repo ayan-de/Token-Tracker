@@ -641,6 +641,44 @@ pub async fn get_providers() -> impl IntoResponse {
     (StatusCode::OK, Json(json!([])))
 }
 
+pub async fn clear_all_cache() -> impl IntoResponse {
+    let Some(cache) = read_cache() else {
+        return (StatusCode::OK, Json(json!({ "status": "cleared" }))).into_response();
+    };
+
+    let usage_count = cache
+        .get("usage")
+        .and_then(|u| u.as_array())
+        .map(|arr| arr.len())
+        .unwrap_or(0);
+
+    let cost_count = cache
+        .get("cost")
+        .and_then(|c| c.as_array())
+        .map(|arr| arr.len())
+        .unwrap_or(0);
+
+    let empty_payload = json!({
+        "usage": [],
+        "cost": [],
+        "installedProviders": [],
+        "timestamp": std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0)
+    });
+
+    if let Err(e) = write_cache(&empty_payload) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Failed to write cache: {}", e) }))).into_response();
+    }
+
+    (StatusCode::OK, Json(json!({
+        "status": "cleared",
+        "removedUsageEntries": usage_count,
+        "removedCostEntries": cost_count,
+    }))).into_response()
+}
+
 pub async fn clear_provider_cache(
     axum::extract::Path(provider): axum::extract::Path<String>,
 ) -> impl IntoResponse {

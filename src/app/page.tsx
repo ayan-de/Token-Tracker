@@ -61,6 +61,7 @@ export default function HomePage() {
     installedProviders,
     refreshData,
     clearCache,
+    clearAllCache,
     updateAppSettings,
     addCredential,
     removeCredential,
@@ -284,6 +285,7 @@ export default function HomePage() {
             onRemoveCredential={removeCredential}
             onImportCookies={importBrowserCookies}
             onRefetchBrowsers={refetchBrowsers}
+            onClearAllCache={clearAllCache}
           />
         )}
 

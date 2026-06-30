@@ -69,6 +69,12 @@ export async function clearProviderCache(provider: string): Promise<{ status: st
   });
 }
 
+export async function clearAllCache(): Promise<{ status: string; removedUsageEntries: number; removedCostEntries: number }> {
+  return request("/api/v1/cache", {
+    method: "DELETE",
+  });
+}
+
 export async function getSettings(): Promise<any> {
   return request<any>("/api/v1/settings");
 }

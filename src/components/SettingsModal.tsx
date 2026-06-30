@@ -16,6 +16,7 @@ interface SettingsModalProps {
   onRemoveCredential: (provider: string) => Promise<boolean>;
   onImportCookies: (browserId: string, profileId: string, providerId: string) => Promise<boolean>;
   onRefetchBrowsers: () => Promise<void>;
+  onClearAllCache: () => Promise<boolean>;
 }
 
 export default function SettingsModal({
@@ -29,8 +30,10 @@ export default function SettingsModal({
   onRemoveCredential,
   onImportCookies,
   onRefetchBrowsers,
+  onClearAllCache,
 }: SettingsModalProps) {
   const { theme } = useTheme();
+  const [isClearingAll, setIsClearingAll] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'providers' | 'credentials' | 'import'>('general');
   const [credProvider, setCredProvider] = useState<string>("claude");
   const [credType, setCredType] = useState<'key' | 'cookie'>('key');
@@ -211,6 +214,25 @@ export default function SettingsModal({
                 <span className="text-[10px] font-fira bg-primary/40 px-2 py-1 rounded border border-border-subtle text-text-muted">
                   ~/.config/CodexBar
                 </span>
+              </div>
+
+              {/* Clear All Cache */}
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-text-muted">Clear All Cache</span>
+                <button
+                  onClick={async () => {
+                    setIsClearingAll(true);
+                    try {
+                      await onClearAllCache();
+                    } finally {
+                      setIsClearingAll(false);
+                    }
+                  }}
+                  disabled={isClearingAll}
+                  className="px-3 py-1.5 bg-status-warning/15 hover:bg-status-warning/25 text-status-warning text-[10px] font-semibold rounded border border-status-warning/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer border-0"
+                >
+                  {isClearingAll ? "Clearing..." : "Clear All"}
+                </button>
               </div>
             </div>
           )}
