@@ -472,7 +472,7 @@ export default function SettingsModal({
                       if (!importBrowserId || !importProfileId || !importProviderId) return;
                       await onImportCookies(importBrowserId, importProfileId, importProviderId);
                     }}
-                    className="w-full py-2 bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple text-white hover:opacity-90 active:opacity-100 transition-opacity text-xs font-bold rounded-lg shadow-lg shadow-accent-blue/10 cursor-pointer border-0 mt-1"
+                    className="w-full py-2 bg-gradient-to-r from-accent-cyan via-accent-blue to-accent-purple text-white hover:opacity-90 active:opacity-100 transition-opacity text-xs font-bold rounded-sm shadow-lg shadow-accent-blue/10 cursor-pointer border-0 mt-1"
                   >
                     Import & Sync Cookies
                   </button>
