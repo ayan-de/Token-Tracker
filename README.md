@@ -1,10 +1,19 @@
+<div align="center">
+
+<img src="/public/logos/app-logo.png" width="256" align="center">
+
 # TokenTracker
+
+[![Release][version-shield]][release-link]
+[![Rust][rust-shield]][rust-link]
+[![License: MIT][license-shield]][license-link]
 
 TokenTracker is a cross-platform desktop application that monitors AI provider quotas, rate limits, and spend statistics in real-time.
 
-| | |
-|:---:|:---:|
-| <img src="/public/logos/image.png" width="290"> | <img src="/public/logos/image%20copy.png" width="290"> |
+![Light Theme](/public/logos/image.png)
+![Dark Theme](/public/logos/image%20copy.png)
+
+</div>
 
 ## Features
 
@@ -48,7 +57,7 @@ Frontend (Tauri/Next.js)
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/) (latest stable)
+- [Rust](https://rustup.rs/) 1.85+ (Edition 2024)
 - [Node.js](https://nodejs.org/) 20+
 
 ### Development
@@ -96,4 +105,12 @@ Usage and cost data is cached locally for offline reading and fast startup:
 
 ## License
 
-MIT
+**MIT License** — see [LICENSE](LICENSE) for full terms.
+
+<!-- Badge definitions -->
+[version-shield]: https://img.shields.io/badge/release-0.1.11-blue?style=flat-square
+[release-link]: https://github.com/ayan-de/Token-Tracker/releases
+[rust-shield]: https://img.shields.io/badge/rust-0.1.0-orange?style=flat-square&logo=rust&logoColor=white
+[rust-link]: https://github.com/ayan-de/Token-Tracker/tree/main/backend
+[license-shield]: https://img.shields.io/badge/license-MIT-green?style=flat-square
+[license-link]: https://github.com/ayan-de/Token-Tracker/blob/main/LICENSE
