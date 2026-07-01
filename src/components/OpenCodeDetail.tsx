@@ -7,6 +7,7 @@ import { formatTimeUntil, getProviderGradient } from "@/lib/utils";
 import ProviderSubTabBar, { type SubTab } from "./ProviderSubTabBar";
 import OpenCodeDBHistory from "./OpenCodeDBHistory";
 import LoginMethodBadge from "./LoginMethodBadge";
+import SourceBadge from "./SourceBadge";
 import ActionMenu from "./ActionMenu";
 import { useTheme, useModals } from "@/app/page";
 
@@ -164,7 +165,7 @@ export default memo(function OpenCodeDetail({ provider }: OpenCodeDetailProps) {
             <img src={logoUrl} alt="" className="w-8 h-8 object-contain" />
           )}
           <div className="flex flex-col">
-            <h2 className="text-base font-bold text-text-main leading-tight">OpenCode</h2>
+            <h2 className="text-base font-bold text-text-main leading-tight flex items-center gap-1">OpenCode{provider.source && <SourceBadge source={provider.source} />}</h2>
             <span className="text-[11px] text-text-muted/75">
               BYOK aggregator — usage via each provider&apos;s API
             </span>
